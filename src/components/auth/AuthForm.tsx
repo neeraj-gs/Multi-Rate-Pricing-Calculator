@@ -30,6 +30,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   const isSignup = mode === 'signup';
 
+  /*
+   * The app shell ends a session whose account no longer exists. Landing on a
+   * bare sign-in form after that looks like being logged out at random, so the
+   * reason travels in the query string and is stated here.
+   */
+  const endedReason =
+    searchParams.get('reason') === 'account-unavailable'
+      ? 'Your session ended because that account is no longer available. Sign in again.'
+      : null;
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
@@ -83,6 +93,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4" noValidate>
+        {endedReason && !formError ? (
+          <p className="rounded-sheet border border-ink-700 bg-ink-850 px-3.5 py-3 text-sm text-quill-300">
+            {endedReason}
+          </p>
+        ) : null}
+
         {formError ? (
           <div
             role="alert"

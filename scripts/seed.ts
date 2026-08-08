@@ -96,12 +96,39 @@ function isoDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * A date inside a given month, counting back from the current one.
+ *
+ * Day is clamped to 28 so February never rolls forward into March and quietly
+ * moves a document into the wrong reporting period. Never dated in the future,
+ * so "this month" is always partial rather than oddly complete.
+ */
+function isoInMonth(monthsAgo: number, dayOfMonth: number): string {
+  const now = new Date();
+  const target = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsAgo, Math.min(dayOfMonth, 28)),
+  );
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  if (target > today) target.setUTCDate(Math.max(1, now.getUTCDate() - 1));
+  return target.toISOString().slice(0, 10);
+}
+
 async function main() {
   await connectToDatabase();
   console.log('Connected.');
 
-  // --- Reset the demo account only ---------------------------------------
+  /*
+   * Reset the demo account's *data*, but keep the account itself.
+   *
+   * Deleting and recreating the user mints a new ObjectId, and any session
+   * cookie still in a browser carries the old one — so after a reseed you are
+   * signed in as a user that no longer exists and the app shows you an empty
+   * account. Preserving the id makes reseeding safe to run while logged in.
+   */
   const existing = await User.findOne({ email: DEMO_EMAIL }).lean();
+
   if (existing) {
     const userId = new Types.ObjectId(String(existing._id));
     await Promise.all([
@@ -109,20 +136,25 @@ async function main() {
       AuditLog.deleteMany({ userId }),
       ShareLink.deleteMany({ userId }),
       Counter.deleteOne({ _id: `${String(existing._id)}:document` }),
-      User.deleteOne({ _id: userId }),
     ]);
-    console.log('Cleared the previous demo account.');
+    console.log('Cleared the demo account’s documents (the account itself is kept).');
   }
 
-  const user = await User.create({
-    email: DEMO_EMAIL,
-    name: 'Demo Reviewer',
-    company: 'LedgerLine Demo Co',
-    passwordHash: await hashPassword(DEMO_PASSWORD),
-    preferences: { currency: 'AED', defaultTaxPercent: 500, documentPrefix: 'QT' },
-  });
-  const userId = String(user._id);
-  console.log(`Created ${DEMO_EMAIL}`);
+  const user = await User.findOneAndUpdate(
+    { email: DEMO_EMAIL },
+    {
+      $set: {
+        name: 'Demo Reviewer',
+        company: 'LedgerLine Demo Co',
+        passwordHash: await hashPassword(DEMO_PASSWORD),
+        preferences: { currency: 'AED', defaultTaxPercent: 500, documentPrefix: 'QT' },
+      },
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true },
+  );
+
+  const userId = String(user!._id);
+  console.log(`${existing ? 'Refreshed' : 'Created'} ${DEMO_EMAIL}`);
 
   // --- The brief's sample document, first, so it is easy to find ---------
   const sample = await createDocument(
@@ -160,13 +192,30 @@ async function main() {
   }
   console.log(`  ${sample.number}  worked example         ${sample.totals.grandTotal} USD`);
 
-  // --- A year of documents ------------------------------------------------
+  /*
+   * A year of documents, distributed month by month rather than by scattering
+   * random dates across 330 days.
+   *
+   * Uniform random dates leave gaps — a trend chart with three empty months in
+   * it looks broken rather than sparse, and the report is the page a reviewer
+   * spends the longest on. Walking the months and placing 2–4 documents in each
+   * guarantees every bucket has a bar, while the counts still vary enough to be
+   * worth plotting.
+   */
   let created = 1;
   let finalized = 0;
 
-  for (let index = 0; index < 34; index += 1) {
+  const plan: Array<{ monthsAgo: number; dayOfMonth: number }> = [];
+  for (let monthsAgo = 11; monthsAgo >= 0; monthsAgo -= 1) {
+    const perMonth = 2 + Math.floor(random() * 3); // 2–4
+    for (let n = 0; n < perMonth; n += 1) {
+      plan.push({ monthsAgo, dayOfMonth: 2 + Math.floor(random() * 26) });
+    }
+  }
+
+  for (const slot of plan) {
     const customer = pick(CUSTOMERS);
-    const currency = random() < 0.75 ? 'AED' : random() < 0.6 ? 'USD' : 'SAR';
+    const currency = random() < 0.62 ? 'AED' : random() < 0.65 ? 'USD' : 'SAR';
     const lineCount = 1 + Math.floor(random() * 5);
 
     const lines = Array.from({ length: lineCount }, () => {
@@ -212,7 +261,7 @@ async function main() {
           'Discovery and scoping',
         ]),
         customer,
-        issueDate: isoDaysAgo(Math.floor(random() * 330) + 3),
+        issueDate: isoInMonth(slot.monthsAgo, slot.dayOfMonth),
         currency,
         lines,
       }),
