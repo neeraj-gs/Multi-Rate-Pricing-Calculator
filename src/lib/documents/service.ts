@@ -60,6 +60,76 @@ export function assertEditable(document: Pick<DocumentRecord, 'status'>): void {
 }
 
 /**
+ * Whether a write failed because `{ userId, number }` is already taken.
+ *
+ * Checking first — "does a document with this number exist?" — and then saving
+ * is the obvious approach and is a race: two requests both find the number free
+ * and both proceed. The unique index is the only thing that can actually
+ * decide, so the write is attempted and its rejection is interpreted. The check
+ * that cannot be raced is the one the database performs.
+ */
+function isNumberCollision(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: number }).code === 11000 &&
+    JSON.stringify((error as { keyPattern?: unknown }).keyPattern ?? {}).includes('number')
+  );
+}
+
+/** Translates that collision for the person who chose the number. */
+function rethrowNumberCollision(error: unknown, number: string): never {
+  if (!isNumberCollision(error)) throw error;
+
+  throw new ApiError(
+    409,
+    'NUMBER_TAKEN',
+    `You already have a document numbered ${number}. Document numbers must be unique.`,
+    [{ path: 'number', message: 'This number is already in use.', code: 'NUMBER_TAKEN' }],
+  );
+}
+
+/**
+ * Creates a document under a minted number, stepping past any a person has
+ * already claimed by hand.
+ *
+ * The counter alone used to be enough: it hands out each sequence exactly once,
+ * so no two *minted* numbers could collide. Editable numbers break that
+ * assumption — rename a draft to `QT-0050` and the counter will eventually
+ * reach 50 and mint it again. Without this the fiftieth document a user creates
+ * fails with a duplicate-key error and no explanation.
+ *
+ * Each attempt burns a sequence value rather than reusing it, because the
+ * skipped numbers are exactly the ones already in use. The loop is bounded so a
+ * user who has manually claimed a long run of numbers gets a clear 409 instead
+ * of a request that never returns.
+ */
+async function createWithMintedNumber(
+  userId: string,
+  prefix: string,
+  build: (number: string, sequence: number) => Record<string, unknown>,
+) {
+  let lastNumber = '';
+
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const sequence = await nextSequence(userId);
+    lastNumber = formatDocumentNumber(prefix, sequence);
+    try {
+      return await DocumentModel.create(build(lastNumber, sequence));
+    } catch (error) {
+      if (!isNumberCollision(error)) throw error;
+    }
+  }
+
+  throw new ApiError(
+    409,
+    'NUMBER_TAKEN',
+    `Could not find a free document number near ${lastNumber}. Change your document prefix in Settings, or rename the documents holding that range.`,
+    [{ path: 'number', message: 'No free number available.', code: 'NUMBER_TAKEN' }],
+  );
+}
+
+/**
  * Optimistic concurrency.
  *
  * Two tabs open on the same draft is not a hypothetical — it is the normal way
@@ -162,16 +232,15 @@ export async function createDocument(
 ): Promise<ApiDocument> {
   const owner = await User.findById(userId).lean();
   const prefix = owner?.preferences?.documentPrefix ?? 'QT';
-  const sequence = await nextSequence(userId);
 
   const { lines: computed, totals } = calculateDocument({
     currency: input.currency,
     lines: input.lines as LineInput[],
   });
 
-  const created = await DocumentModel.create({
+  const created = await createWithMintedNumber(userId, prefix, (number, sequence) => ({
     userId: new Types.ObjectId(userId),
-    number: formatDocumentNumber(prefix, sequence),
+    number,
     sequence,
     title: input.title,
     customer: input.customer,
@@ -189,7 +258,7 @@ export async function createDocument(
       grandTotalMinor: totals.grandTotalMinor,
     },
     revision: 1,
-  });
+  }));
 
   await recordAudit({
     userId,
@@ -233,6 +302,7 @@ export async function updateDocument(
   assertRevision(document, input.revision);
 
   const before = {
+    number: document.number,
     title: document.title,
     customer: JSON.parse(JSON.stringify(document.customer)),
     issueDate: document.issueDate,
@@ -243,6 +313,7 @@ export async function updateDocument(
     grandTotalMinor: document.totals.grandTotalMinor,
   };
 
+  if (input.number !== undefined) document.number = input.number;
   if (input.title !== undefined) document.title = input.title;
   if (input.customer !== undefined) {
     document.customer = input.customer as typeof document.customer;
@@ -282,7 +353,11 @@ export async function updateDocument(
   }
 
   document.revision += 1;
-  await document.save();
+  try {
+    await document.save();
+  } catch (error) {
+    rethrowNumberCollision(error, document.number);
+  }
 
   await recordAudit({
     userId,
@@ -291,6 +366,7 @@ export async function updateDocument(
     entityId: documentId,
     entityLabel: `${document.number} — ${document.title}`,
     changes: diffFields(before, {
+      number: document.number,
       title: document.title,
       customer: JSON.parse(JSON.stringify(document.customer)),
       issueDate: document.issueDate,
@@ -533,7 +609,6 @@ export async function duplicateDocument(
 
   const owner = await User.findById(userId).lean();
   const prefix = owner?.preferences?.documentPrefix ?? 'QT';
-  const sequence = await nextSequence(userId);
 
   // Recomputed from the source's inputs rather than copied, so a duplicate is
   // never a vessel for stale figures.
@@ -543,9 +618,9 @@ export async function duplicateDocument(
     lines: inputs,
   });
 
-  const copy = await DocumentModel.create({
+  const copy = await createWithMintedNumber(userId, prefix, (number, sequence) => ({
     userId: new Types.ObjectId(userId),
-    number: formatDocumentNumber(prefix, sequence),
+    number,
     sequence,
     title: overrides.title ?? `${source.title} (copy)`,
     customer: JSON.parse(JSON.stringify(source.customer)),
@@ -564,7 +639,7 @@ export async function duplicateDocument(
     },
     duplicatedFromId: source._id,
     revision: 1,
-  });
+  }));
 
   await recordAudit({
     userId,

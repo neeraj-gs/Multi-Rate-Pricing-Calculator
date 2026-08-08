@@ -7,6 +7,7 @@ import {
   paginationSchema,
 } from './common';
 import { MAX_LINES_PER_DOCUMENT } from '@/lib/db/models/document';
+import { normalizeDisplayCurrency } from '@/lib/display-currency';
 import { parseQuantity, PricingError, QUANTITY_DENOMINATOR } from '@/lib/pricing';
 
 /**
@@ -19,6 +20,32 @@ import { parseQuantity, PricingError, QUANTITY_DENOMINATOR } from '@/lib/pricing
  * having its fields silently dropped, which would produce a document with no
  * discount and no explanation.
  */
+/**
+ * A document number, as a person may type it.
+ *
+ * Numbers are minted from an atomic counter — `QT-0042` — but the counter's
+ * output is a starting point, not a rule. A real book has numbers that follow a
+ * convention someone chose: `INV-2026-014`, `2026/Q3/007`, a series continued
+ * from whatever system this replaced. The counter keeps handing out
+ * collision-free defaults; this makes the label editable.
+ *
+ * Uppercased on the way in, so `qt-42` and `QT-42` cannot become two documents
+ * that look identical in a list. The character set is deliberately narrow —
+ * letters, digits, dash, slash, underscore, dot — because a document number
+ * ends up in filenames, URLs and spreadsheet cells, and a space or a comma in
+ * one of those is somebody's afternoon.
+ */
+export const documentNumberSchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .min(1, 'Document number is required.')
+  .max(32, 'Document number must be 32 characters or fewer.')
+  .regex(
+    /^[A-Z0-9][A-Z0-9._/-]*$/,
+    'Use letters, digits, dashes, slashes, dots or underscores, starting with a letter or digit.',
+  );
+
 export const discountSchema = z
   .object({
     type: z.enum(['percent', 'fixed'], {
@@ -166,6 +193,8 @@ export const createDocumentSchema = z
  */
 export const updateDocumentSchema = z
   .object({
+    /** Uniqueness is the database's to enforce; see the note in the service. */
+    number: documentNumberSchema.optional(),
     title: z.string().trim().min(1, 'Title is required.').max(200).optional(),
     currency: currencySchema.optional(),
     customer: z
@@ -267,6 +296,17 @@ export const reportRangeSchema = z
     status: z.enum(['draft', 'finalized', 'all']).default('all'),
     currency: currencySchema.optional(),
     groupBy: z.enum(['day', 'week', 'month']).default('month'),
+    /**
+     * Convert every figure into this currency before returning it.
+     *
+     * Absent (or `native`) keeps currencies separate and never combined, which
+     * is the only view that makes no rate assumption. Distinct from `currency`
+     * above, which *filters* to one currency rather than converting into it.
+     */
+    display: z
+      .string()
+      .transform((value) => normalizeDisplayCurrency(value))
+      .optional(),
   })
   .refine((value) => value.from <= value.to, {
     path: ['from'],

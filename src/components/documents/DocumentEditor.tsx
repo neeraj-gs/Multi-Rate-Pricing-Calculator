@@ -17,8 +17,9 @@ import {
 
 import { api, ApiClientError, newIdempotencyKey } from '@/lib/api-client';
 import { SUPPORTED_CURRENCIES } from '@/lib/pricing';
-import { cn, currencySymbol, formatDateTime, todayISO } from '@/lib/utils';
+import { cn, currencyName, currencySymbol, formatDateTime, todayISO } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { CurrencySelect } from '@/components/ui/currency-select';
 import { Textarea } from '@/components/ui/field';
 import {
   Dialog,
@@ -96,6 +97,7 @@ export function DocumentEditor({
   const router = useRouter();
 
   const [document, setDocument] = React.useState(initial);
+  const [number, setNumber] = React.useState(initial.number);
   const [title, setTitle] = React.useState(initial.title);
   const [customerName, setCustomerName] = React.useState(initial.customer.name);
   const [customerEmail, setCustomerEmail] = React.useState(initial.customer.email);
@@ -136,6 +138,7 @@ export function DocumentEditor({
   const dirty = React.useMemo(
     () =>
       JSON.stringify({
+        number,
         title,
         customerName,
         customerEmail,
@@ -147,6 +150,7 @@ export function DocumentEditor({
         lines: lines.map(toLineInput),
       }) !==
       JSON.stringify({
+        number: document.number,
         title: document.title,
         customerName: document.customer.name,
         customerEmail: document.customer.email,
@@ -157,14 +161,16 @@ export function DocumentEditor({
         currency: document.currency,
         lines: toDraftLines(document).map(toLineInput),
       }),
-    [title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, currency, lines, document],
+    [number, title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, currency, lines, document],
   );
 
   /* --- The live page ----------------------------------------------------- */
 
   const page: DocumentPageProps = React.useMemo(
     () => ({
-      number: document.number,
+      // The typed number, not the stored one, so the page you are looking at is
+      // the page you are about to save.
+      number: number.trim().toUpperCase() || document.number,
       status: document.status,
       title,
       customer: {
@@ -210,7 +216,7 @@ export function DocumentEditor({
           }
         : null,
     }),
-    [document, title, customerName, customerEmail, customerAddress, issueDate, dueDate, currency, notes, issuer, lines, preview, symbol],
+    [document, number, title, customerName, customerEmail, customerAddress, issueDate, dueDate, currency, notes, issuer, lines, preview, symbol],
   );
 
   /* --- Line editing ------------------------------------------------------ */
@@ -247,6 +253,7 @@ export function DocumentEditor({
       const { document: updated } = await api.patch<{ document: ApiDocument }>(
         `/documents/${document.id}`,
         {
+          number: number.trim().toUpperCase(),
           title: title.trim(),
           customer: {
             name: customerName.trim(),
@@ -264,6 +271,7 @@ export function DocumentEditor({
         },
       );
       setDocument(updated);
+      setNumber(updated.number);
       setLines(toDraftLines(updated));
       setCurrency(updated.currency);
       setSavedAt(updated.updatedAt);
@@ -284,7 +292,7 @@ export function DocumentEditor({
     } finally {
       setSaving(false);
     }
-  }, [document, title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, lines]);
+  }, [document, number, title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, lines]);
 
   /**
    * The PDF always reflects what is *stored*, so an unsaved edit is saved
@@ -313,6 +321,7 @@ export function DocumentEditor({
         newIdempotencyKey(),
       );
       setDocument(updated);
+      setNumber(updated.number);
       setLines(toDraftLines(updated));
       setCurrency(updated.currency);
       toast.success(`${updated.number} finalized. It is now read-only.`);
@@ -403,9 +412,12 @@ export function DocumentEditor({
           </Button>
 
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="whitespace-nowrap font-mono text-xs text-brass-400">
-              {document.number}
-            </span>
+            <NumberField
+              value={number}
+              onChange={setNumber}
+              readOnly={readOnly}
+              error={combinedFieldErrors.number}
+            />
             <StatusBadge status={document.status} />
             {readOnly ? null : dirty ? (
               <span className="whitespace-nowrap font-mono text-[0.625rem] text-brass-300">
@@ -751,26 +763,18 @@ function Details(props: {
             Currency
           </label>
           {props.readOnly ? (
-            <p className="tabular text-sm text-quill-100">{props.currency}</p>
+            <p className="text-sm text-quill-100">
+              <span className="font-mono text-xs text-brass-400">{props.currency}</span>{' '}
+              <span className="text-quill-500">{currencyName(props.currency)}</span>
+            </p>
           ) : (
-            <select
+            <CurrencySelect
               id="doc-currency"
               value={props.currency}
-              onChange={(event) => props.setCurrency(event.target.value)}
-              aria-invalid={Boolean(props.errors.currency)}
-              className={cn(
-                'h-9 w-full appearance-none rounded-sheet border bg-ink-900 px-2.5 text-sm text-quill-100 transition-colors',
-                'focus:border-brass-600 focus:bg-ink-800',
-                "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%237f8b9f%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:16px] bg-[position:right_0.6rem_center] bg-no-repeat",
-                props.errors.currency ? 'border-oxblood-500' : 'border-ink-600',
-              )}
-            >
-              {SUPPORTED_CURRENCIES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
+              onChange={props.setCurrency}
+              options={SUPPORTED_CURRENCIES}
+              invalid={Boolean(props.errors.currency)}
+            />
           )}
 
           {/*
@@ -794,6 +798,67 @@ function Details(props: {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * The document number, edited in place.
+ *
+ * The number is the document's identity, so it belongs where identity belongs —
+ * at the top of the command bar, reading as a label rather than sitting in a
+ * form field halfway down a panel. It is a text input the whole time; what
+ * changes on focus is only the chrome, which keeps the caret, tab order and
+ * screen-reader behaviour of an ordinary field without the visual weight of one.
+ *
+ * Sized in `ch` against the mono face so the box tracks the text instead of
+ * leaving a fixed run of empty space beside a short number.
+ *
+ * Uppercased as you type, matching what the server stores: `qt-1` becoming
+ * `QT-1` on save, after you have looked away, is the kind of small surprise
+ * that makes people distrust a form.
+ */
+function NumberField({
+  value,
+  onChange,
+  readOnly,
+  error,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  readOnly: boolean;
+  error?: string;
+}) {
+  const id = React.useId();
+
+  if (readOnly) {
+    return (
+      <span className="whitespace-nowrap font-mono text-xs text-brass-400">{value}</span>
+    );
+  }
+
+  return (
+    <div className="flex items-center">
+      <label htmlFor={id} className="sr-only">
+        Document number
+      </label>
+      <input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value.toUpperCase())}
+        spellCheck={false}
+        autoComplete="off"
+        aria-invalid={Boolean(error)}
+        title="Document number — edit it while this document is a draft"
+        style={{ width: `${Math.min(Math.max(value.length, 7), 32) + 2}ch` }}
+        className={cn(
+          'h-7 rounded-sheet border border-transparent bg-transparent px-1.5',
+          'font-mono text-xs text-brass-400 transition-colors',
+          'hover:border-ink-600 hover:bg-ink-850',
+          'focus:border-brass-600 focus:bg-ink-850 focus:outline-none',
+          error && 'border-oxblood-500 bg-oxblood-500/10',
+        )}
+      />
+    </div>
   );
 }
 

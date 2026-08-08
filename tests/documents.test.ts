@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { clearDatabase, startTestDatabase, stopTestDatabase } from './helpers/db';
-import { DocumentModel, User } from '@/lib/db';
+import { AuditLog, DocumentModel, User } from '@/lib/db';
 import { toApiError } from '@/lib/api/errors';
 import {
   addLine,
@@ -16,7 +16,11 @@ import {
 } from '@/lib/documents/service';
 import { listDocuments } from '@/lib/documents/queries';
 import { buildSummaryReport } from '@/lib/reports/summary';
-import { createDocumentSchema, reportRangeSchema } from '@/lib/validation/documents';
+import {
+  createDocumentSchema,
+  reportRangeSchema,
+  updateDocumentSchema,
+} from '@/lib/validation/documents';
 
 beforeAll(startTestDatabase);
 afterAll(stopTestDatabase);
@@ -142,6 +146,27 @@ describe('creating a document', () => {
     expect(new Set(numbers).size).toBe(10);
   });
 
+  /*
+   * Editable numbers break the counter's guarantee.
+   *
+   * The atomic $inc means no two *minted* numbers collide, which used to be the
+   * whole story. Once a number can be typed, a person can claim QT-0003 by hand
+   * and the counter will walk straight into it — and the unique index turns that
+   * into a duplicate-key error on an ordinary "New document" click.
+   */
+  it('steps past a number someone has already claimed by hand', async () => {
+    const userId = await makeUser();
+    const first = await createDocument(userId, parsePayload());
+    await updateDocument(userId, first.id, { number: 'QT-0002' });
+
+    // The counter's next value is 2, which is now taken.
+    const second = await createDocument(userId, parsePayload());
+    expect(second.number).toBe('QT-0003');
+
+    const numbers = [first, second].map((document) => document.number);
+    expect(new Set(numbers).size).toBe(2);
+  });
+
   it('creates a document with no lines yet', async () => {
     // The normal way to start: create the document, then add lines in the
     // editor. This is a regression test — the new-document form used to send a
@@ -265,6 +290,26 @@ describe('the finalized document is immutable', () => {
     await expectApiError(() => deleteDocument(userId, id), 'DOCUMENT_FINALIZED', 409);
   });
 
+  /*
+   * The number is the most immutable thing about an issued document, not the
+   * least: it is the identity the customer's copy was sent under, and the
+   * handle every audit entry and report row refers to. Renumbering after issue
+   * is precisely the hole the lifecycle exists to close.
+   */
+  it('rejects renumbering, because the customer already has that number', async () => {
+    const { userId, id } = await makeFinalized();
+    const before = await DocumentModel.findById(id).lean();
+
+    await expectApiError(
+      () => updateDocument(userId, id, { number: 'INV-9999' }),
+      'DOCUMENT_FINALIZED',
+      409,
+    );
+
+    const after = await DocumentModel.findById(id).lean();
+    expect(after?.number).toBe(before?.number);
+  });
+
   it('rejects a second finalize rather than silently succeeding', async () => {
     const { userId, id } = await makeFinalized();
     await expectApiError(
@@ -320,6 +365,82 @@ describe('finalize validation', () => {
     expect(error.details.some((detail) => /greater than zero/i.test(detail.message))).toBe(
       true,
     );
+  });
+});
+
+describe('renumbering a draft', () => {
+  it('renames the document and leaves every figure alone', async () => {
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+
+    const renamed = await updateDocument(userId, draft.id, { number: 'INV-2026-014' });
+
+    expect(renamed.number).toBe('INV-2026-014');
+    expect(renamed.totals.grandTotal).toBe('421.50');
+    expect(renamed.lines).toHaveLength(3);
+  });
+
+  it('uppercases the number, so two documents cannot look identical in a list', async () => {
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+
+    const parsed = updateDocumentSchema.parse({ number: '  inv-2026/014  ' });
+    const renamed = await updateDocument(userId, draft.id, parsed);
+
+    expect(renamed.number).toBe('INV-2026/014');
+  });
+
+  it('refuses a number another document already holds', async () => {
+    const userId = await makeUser();
+    const first = await createDocument(userId, parsePayload());
+    const second = await createDocument(userId, parsePayload());
+
+    const error = await expectApiError(
+      () => updateDocument(userId, second.id, { number: first.number }),
+      'NUMBER_TAKEN',
+      409,
+    );
+    expect(error.details[0].path).toBe('number');
+
+    // The rejected write leaves the document as it was, rather than half-applied.
+    const reloaded = await DocumentModel.findById(second.id).lean();
+    expect(reloaded?.number).toBe(second.number);
+  });
+
+  it('lets two users hold the same number, because numbering is per account', async () => {
+    const alice = await makeUser('alice@example.com');
+    const bob = await makeUser('bob@example.com');
+    const aliceDoc = await createDocument(alice, parsePayload());
+    const bobDoc = await createDocument(bob, parsePayload());
+
+    await updateDocument(alice, aliceDoc.id, { number: 'SHARED-01' });
+    const renamed = await updateDocument(bob, bobDoc.id, { number: 'SHARED-01' });
+
+    expect(renamed.number).toBe('SHARED-01');
+  });
+
+  it('rejects a number with characters that break filenames and URLs', async () => {
+    for (const bad of ['', 'INV 2026', 'INV,2026', '-LEADING', 'INV#1']) {
+      expect(updateDocumentSchema.safeParse({ number: bad }).success).toBe(false);
+    }
+    for (const good of ['QT-0042', 'INV-2026-014', '2026/Q3/007', 'A.1_2']) {
+      expect(updateDocumentSchema.safeParse({ number: good }).success).toBe(true);
+    }
+  });
+
+  it('records the rename in the audit log', async () => {
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+    await updateDocument(userId, draft.id, { number: 'INV-0007' });
+
+    const entry = await AuditLog.findOne({
+      entityId: draft.id,
+      action: 'document.update',
+    }).lean();
+
+    expect(entry?.changes).toMatchObject({
+      number: { from: 'QT-0001', to: 'INV-0007' },
+    });
   });
 });
 
