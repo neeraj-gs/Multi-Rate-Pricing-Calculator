@@ -391,6 +391,8 @@ export default function TessellationScreen() {
   const [enabled, setEnabled] = React.useState(false);
   const [reduced, setReduced] = React.useState(false);
   const [visible, setVisible] = React.useState(true);
+  /** Set when the browser takes the WebGL context back. See `onCreated` below. */
+  const [lost, setLost] = React.useState(false);
 
   React.useEffect(() => {
     const prefersReduced = window.matchMedia(
@@ -448,7 +450,7 @@ export default function TessellationScreen() {
 
   return (
     <div ref={container} className="absolute inset-0" aria-hidden>
-      {enabled ? (
+      {enabled && !lost ? (
         <Canvas
           dpr={[1, 1.75]}
           frameloop={visible ? 'always' : 'demand'}
@@ -459,6 +461,31 @@ export default function TessellationScreen() {
             toneMapping: THREE.ACESFilmicToneMapping,
           }}
           camera={{ fov: 38, position: [0, 0, 9.4] }}
+          /*
+           * A WebGL context is not guaranteed for the life of the page. The
+           * browser takes it back when the GPU driver resets, when too many
+           * contexts are open across tabs, or when a laptop switches graphics
+           * card — and once lost, the canvas paints nothing ever again unless
+           * the scene is rebuilt.
+           *
+           * The default behaviour is therefore a permanently black hero on
+           * somebody's machine, with a console warning as the only clue.
+           * Preventing the default event keeps the browser willing to restore
+           * the context, and dropping to the static screen in the meantime
+           * means the page still looks like itself rather than like a bug.
+           */
+          onCreated={({ gl }) => {
+            const canvas = gl.domElement;
+
+            canvas.addEventListener('webglcontextlost', (event) => {
+              event.preventDefault();
+              setLost(true);
+            });
+
+            // Remounting the Canvas is what actually rebuilds the scene; the
+            // restored context alone has none of the geometry in it.
+            canvas.addEventListener('webglcontextrestored', () => setLost(false));
+          }}
         >
           <React.Suspense fallback={null}>
             <Scene reduced={reduced} pointer={pointer} scroll={scroll} />
