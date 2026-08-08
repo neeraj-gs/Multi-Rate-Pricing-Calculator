@@ -259,8 +259,11 @@ function Figure({
       <p className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-[#6b7280]">
         {label}
       </p>
+      {/* Nowrap: a currency code orphaned onto its own line above its amount
+          reads as two facts rather than one figure — and the settled figure's
+          rule would then underline only half of it. */}
       <p
-        className={`tabular mt-2 text-lg ${
+        className={`tabular mt-2 whitespace-nowrap text-[0.9375rem] ${
           settled ? 'double-rule inline-block font-semibold' : ''
         }`}
       >
