@@ -348,6 +348,24 @@ describe('document totals', () => {
     const result = calculateDocument({ currency: 'USD', lines: SAMPLE_LINES });
     expect(sumLines(result.lines, 'USD')).toEqual(result.totals);
   });
+
+  it('refuses to return totals that do not reconcile', () => {
+    // The engine cannot produce this state — that is the point. Feeding
+    // `sumLines` a line whose total contradicts its own components proves the
+    // guard fires rather than handing back a plausible-looking wrong number,
+    // which is what would happen if a future refactor broke the arithmetic.
+    const result = calculateDocument({ currency: 'USD', lines: SAMPLE_LINES });
+    const corrupted = result.lines.map((line, index) =>
+      index === 0 ? { ...line, totalMinor: line.totalMinor + 1 } : line,
+    );
+
+    const error = expectPricingError(
+      () => sumLines(corrupted, 'USD'),
+      'AMOUNT_OVERFLOW',
+    );
+    expect(error.message).toMatch(/failed to reconcile/i);
+    expect(error.path).toBe('totals');
+  });
 });
 
 describe('input validation', () => {

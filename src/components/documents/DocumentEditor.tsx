@@ -312,7 +312,9 @@ export function DocumentEditor({ initial }: { initial: ApiDocument }) {
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2.5">
-              <span className="font-mono text-xs text-brass-500">{document.number}</span>
+              <span className="whitespace-nowrap font-mono text-xs text-brass-500">
+                {document.number}
+              </span>
               <StatusBadge status={document.status} />
               {readOnly ? null : dirty ? (
                 <span className="font-mono text-[0.6875rem] text-quill-700">

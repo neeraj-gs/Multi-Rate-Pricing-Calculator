@@ -5,6 +5,8 @@ import {
   formatMinor,
   formatPercent,
   formatQuantity,
+  isSupportedCurrency,
+  minorToMajorNumber,
   mulDivRoundHalfUp,
   multiplyByQuantity,
   parseMoney,
@@ -200,6 +202,57 @@ describe('formatting', () => {
     expect(formatPercent(0)).toBe('0');
     expect(formatQuantity(1000)).toBe('1');
     expect(formatQuantity(2500)).toBe('2.5');
+  });
+});
+
+describe('overflow guards', () => {
+  it('refuses a product too large to represent exactly', () => {
+    // 10^15 x 10^4 / 1 exceeds Number.MAX_SAFE_INTEGER. BigInt keeps the
+    // intermediate exact, and the guard refuses to hand back a lossy Number
+    // rather than silently returning an approximation.
+    expectPricingError(
+      () => mulDivRoundHalfUp(1_000_000_000_000_000, 10_000, 1),
+      'AMOUNT_OVERFLOW',
+    );
+  });
+
+  it('refuses a decimal string with more digits than a Number can hold', () => {
+    expectPricingError(
+      () => parseScaledInt('123456789012345678901234', 2, 'x'),
+      'AMOUNT_OVERFLOW',
+    );
+  });
+});
+
+describe('exponential notation', () => {
+  it('expands a negative exponent without losing digits', () => {
+    expect(parseScaledInt('1.5e-1', 2, 'x')).toBe(15); // 0.15
+    expect(parseScaledInt(1.5e-2, 3, 'x')).toBe(15); // 0.015
+  });
+
+  it('expands a positive exponent that outruns the digits it has', () => {
+    expect(parseScaledInt('1e3', 2, 'x')).toBe(100_000); // 1000.00
+    expect(parseScaledInt('1.25e2', 2, 'x')).toBe(12_500); // 125.00
+  });
+
+  it('rejects malformed exponential input', () => {
+    expectPricingError(() => parseScaledInt('1e', 2, 'x'), 'INVALID_NUMBER');
+    expectPricingError(() => parseScaledInt('e5', 2, 'x'), 'INVALID_NUMBER');
+  });
+});
+
+describe('currency helpers', () => {
+  it('reports which currencies are supported', () => {
+    expect(isSupportedCurrency('AED')).toBe(true);
+    expect(isSupportedCurrency('kwd')).toBe(true);
+    expect(isSupportedCurrency('XBT')).toBe(false);
+    expect(isSupportedCurrency('')).toBe(false);
+  });
+
+  it('converts to major units for display', () => {
+    expect(minorToMajorNumber(42_150, 'USD')).toBe(421.5);
+    expect(minorToMajorNumber(12_345, 'KWD')).toBe(12.345);
+    expect(minorToMajorNumber(1500, 'JPY')).toBe(1500);
   });
 });
 

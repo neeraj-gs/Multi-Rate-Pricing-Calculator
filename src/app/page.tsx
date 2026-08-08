@@ -75,9 +75,20 @@ function Hero() {
   return (
     <section className="relative isolate min-h-[92svh] overflow-hidden pt-16">
       <div className="ink-grid absolute inset-0 opacity-[0.55]" aria-hidden />
-      <div className="absolute inset-y-0 right-0 w-full lg:w-[58%]">
+
+      {/*
+        The scene needs its own column. Below `lg` there isn't one, and letting
+        it span the full width puts the plates directly behind the headline —
+        atmosphere at the cost of being able to read the sentence. On narrow
+        screens the glow below carries the mood on its own.
+      */}
+      <div className="absolute inset-y-0 right-0 hidden w-[58%] lg:block">
         <SceneMount />
       </div>
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_50%_at_70%_30%,rgba(205,163,73,0.13),transparent_70%)] lg:hidden"
+        aria-hidden
+      />
 
       <div className="relative mx-auto flex min-h-[92svh] max-w-6xl items-center px-6">
         <div className="max-w-xl py-24 animate-rise">
@@ -109,7 +120,7 @@ function Hero() {
 
           <dl className="mt-14 grid max-w-md grid-cols-3 gap-6 border-t border-ink-700 pt-6">
             <Stat value="0" label="Floats in the money path" />
-            <Stat value="98" label="Tests on the engine" />
+            <Stat value="74" label="Tests on the engine" />
             <Stat value="2dp" label="Half-up, per line" />
           </dl>
         </div>

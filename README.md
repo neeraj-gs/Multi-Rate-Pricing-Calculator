@@ -73,14 +73,14 @@ npm run dev      # http://localhost:3000
 **4. Verify**
 
 ```bash
-npm run verify   # typecheck, then 98 tests, then a production build
+npm run verify   # typecheck, then 106 tests, then a production build
 ```
 
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and serve |
-| `npm test` | Vitest — 98 tests |
+| `npm test` | Vitest — 106 tests |
 | `npm run test:coverage` | Coverage over the calculation module |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:local` | Local MongoDB, no install needed |
@@ -548,11 +548,11 @@ client to recompute totals locally.
 ## Testing
 
 ```bash
-npm test              # 98 tests
+npm test              # 106 tests
 npm run test:coverage # coverage over the calculation module
 ```
 
-**66 unit tests on the calculation module** — the highest-value surface, as the
+**74 unit tests on the calculation module** — the highest-value surface, as the
 brief notes. They cover the worked example verbatim, float-drift regressions
 (including the `1.005` case, which the test demonstrates failing under naive
 `Math.round`), half-up ties in both directions, per-line versus per-document
