@@ -119,22 +119,33 @@ export function Figure({
 
 /* --- Empty state --------------------------------------------------------- */
 
-/** An empty screen is an invitation to act, so it always carries the action. */
+/**
+ * An empty screen is an invitation to act, so it always carries the action.
+ *
+ * `icon` is a rendered element, not a component type. This is a client
+ * component, and the pages that show an empty state — the dashboard, the
+ * activity log — are server components: a function cannot cross that boundary,
+ * so passing `FileText` threw at render. Passing `<FileText />` is just an
+ * element, which serialises fine.
+ *
+ * That failure only surfaced with zero rows, which is a brand-new account's
+ * very first screen.
+ */
 export function EmptyState({
-  icon: Icon,
+  icon,
   title,
   description,
   action,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ReactNode;
   title: string;
   description: string;
   action?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
-      <div className="mb-5 flex size-12 items-center justify-center rounded-sheet border border-ink-700 bg-ink-800">
-        <Icon className="size-5 text-brass-500" />
+      <div className="mb-5 flex size-12 items-center justify-center rounded-sheet border border-ink-700 bg-ink-800 [&_svg]:size-5 [&_svg]:text-brass-500">
+        {icon}
       </div>
       <h3 className="font-display text-xl text-quill-100">{title}</h3>
       <p className="mt-2 max-w-sm text-pretty text-sm text-quill-500">{description}</p>

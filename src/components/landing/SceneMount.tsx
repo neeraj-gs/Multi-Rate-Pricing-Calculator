@@ -11,8 +11,10 @@ import dynamic from 'next/dynamic';
  * three.js out of the initial bundle, so the headline paints without waiting
  * for a renderer.
  */
-const TesseraScreen = dynamic(() => import('./TesseraScreen'), { ssr: false });
+const TessellationScreen = dynamic(() => import('./TessellationScreen'), {
+  ssr: false,
+});
 
 export function SceneMount() {
-  return <TesseraScreen />;
+  return <TessellationScreen />;
 }

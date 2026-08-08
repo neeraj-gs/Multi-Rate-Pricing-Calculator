@@ -54,7 +54,7 @@ export default async function SharedDocumentPage({
               <Mark />
             </span>
           <span className="font-display text-lg text-quill-100">
-            Tessera
+            LedgerLine
           </span>
         </span>
 

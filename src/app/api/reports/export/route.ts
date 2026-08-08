@@ -18,7 +18,7 @@ export const GET = defineRoute({
       status: 200,
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="tessera-${from}-to-${to}.csv"`,
+        'Content-Disposition': `attachment; filename="ledgerline-${from}-to-${to}.csv"`,
         'Cache-Control': 'no-store',
       },
     }) as unknown as NextResponse;

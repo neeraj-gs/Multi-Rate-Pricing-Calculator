@@ -1,17 +1,17 @@
-# Tessera
+# LedgerLine
 
 A multi-rate pricing calculator for quotes, proposals and billing documents.
 Line items carry their own discount and tax treatment; the server computes every
 figure in exact integer arithmetic; finalizing a document freezes it permanently.
 
-> A *tessera* is a single exactly-cut tile in a mosaic. That is the product's
-> thesis — many precise pieces composing one exact whole, with nothing lost
-> between them — and it is also the visual system: the landing page is built on
-> a provably gap-free octagon-and-square tessellation, extruded and lit as
-> metal.
+> The visual system is the product's thesis as geometry: the landing page is
+> built on a **provably gap-free** octagon-and-square tessellation, extruded and
+> lit as metal. Many precise pieces composing one exact whole, with nothing lost
+> between them — the same claim the calculation engine makes about a document's
+> totals.
 
 **Live:** _<add deployed URL here>_
-**Demo account:** `demo@tessera.app` / `demo-password-2026`
+**Demo account:** `demo@ledgerline.app` / `demo-password-2026`
 
 Built for the CrossVal take-home assignment.
 

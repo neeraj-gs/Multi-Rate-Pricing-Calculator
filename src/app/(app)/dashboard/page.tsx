@@ -52,7 +52,7 @@ export default async function DashboardPage() {
       <div>
         <PageHeader eyebrow="Overview" title={`Welcome, ${firstName}`} />
         <EmptyState
-          icon={FileText}
+          icon={<FileText />}
           title="Nothing here yet"
           description="Create your first document. You can start from the worked example if you want to see how discounts and tax interact."
           action={

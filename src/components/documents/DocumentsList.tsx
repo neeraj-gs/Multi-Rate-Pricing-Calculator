@@ -133,7 +133,7 @@ export function DocumentsList() {
         ) : documents.length === 0 ? (
           <div className="bg-ink-900">
             <EmptyState
-              icon={FileText}
+              icon={<FileText />}
               title={
                 debouncedSearch ? 'Nothing matched that search' : 'No documents yet'
               }

@@ -68,7 +68,7 @@ export default function ApiDocsPage() {
               <Mark />
             </span>
             <span className="font-display text-lg text-quill-100">
-              Tessera
+              LedgerLine
             </span>
           </Link>
           <Link
@@ -202,7 +202,7 @@ lineTotal        = discountedAmount + taxAmount`}</Pre>
           <Pre>{`# Sign in and keep the session cookie
 curl -c jar.txt -X POST http://localhost:3000/api/auth/login \\
   -H 'Content-Type: application/json' \\
-  -d '{"email":"demo@tessera.app","password":"demo-password-2026"}'
+  -d '{"email":"demo@ledgerline.app","password":"demo-password-2026"}'
 
 # Price the brief's sample document without storing anything
 curl -b jar.txt -X POST http://localhost:3000/api/pricing/preview \\

@@ -383,7 +383,7 @@ function Scene({
 
 /* -------------------------------------------------------------------------- */
 
-export default function TesseraScreen() {
+export default function TessellationScreen() {
   const pointer = React.useRef({ x: 0, y: 0 });
   const scroll = React.useRef(0);
   const container = React.useRef<HTMLDivElement>(null);

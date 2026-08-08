@@ -1,12 +1,13 @@
 import { cn } from '@/lib/utils';
 
 /**
- * The mark: one tessera.
+ * The mark: one tile from the tessellation.
  *
  * An octagon with the interstitial square set inside it — the two shapes the
- * hero's tiling is built from, and the reason the product is called what it is.
- * Drawn rather than picked from an icon set, because a stock glyph in the
- * wordmark is the first thing that makes a product look assembled from parts.
+ * hero's tiling is built from, reduced to the smallest unit that still shows
+ * how they interlock. Drawn rather than picked from an icon set, because a
+ * stock glyph in the wordmark is the first thing that makes a product look
+ * assembled from parts.
  */
 export function Mark({ className }: { className?: string }) {
   return (
@@ -34,7 +35,7 @@ export function Wordmark({ className }: { className?: string }) {
         <Mark />
       </span>
       <span className="font-display text-[1.0625rem] tracking-[-0.02em] text-quill-100">
-        Tessera
+        Ledger<span className="text-brass-400">Line</span>
       </span>
     </span>
   );

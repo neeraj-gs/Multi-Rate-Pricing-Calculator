@@ -57,7 +57,7 @@ export default async function ActivityPage() {
 
       {entries.length === 0 ? (
         <EmptyState
-          icon={Activity}
+          icon={<Activity />}
           title="No activity yet"
           description="Once you start creating and editing documents, every change shows up here."
         />

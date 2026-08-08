@@ -46,7 +46,7 @@ export function WhatItIs() {
           whole document.
         </p>
         <p>
-          Tessera works out what each line comes to and what the document comes
+          LedgerLine works out what each line comes to and what the document comes
           to, on the server, in exact integer arithmetic. When the pricing is
           settled you finalize the document, and from that moment it can never
           change — which is what makes it safe to send, and what makes a report
@@ -93,7 +93,7 @@ export function HowYouUseIt() {
         <Step
           index={3}
           title="Finalize it"
-          body="Tessera checks the document is ready — at least one line, a customer, no impossible quantities — then recalculates once and freezes it. From here the API refuses every edit. Need to change something you already sent? Duplicate it into a fresh draft; the original stays exactly as your customer received it."
+          body="LedgerLine checks the document is ready — at least one line, a customer, no impossible quantities — then recalculates once and freezes it. From here the API refuses every edit. Need to change something you already sent? Duplicate it into a fresh draft; the original stays exactly as your customer received it."
           visual={<FinalizeVisual />}
         />
         <Step

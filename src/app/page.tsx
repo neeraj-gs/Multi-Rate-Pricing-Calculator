@@ -122,7 +122,7 @@ function Hero() {
           </h1>
 
           <p className="mt-8 max-w-lg text-pretty text-lg leading-relaxed text-quill-300">
-            Every line carries its own discount and tax rate. Tessera computes
+            Every line carries its own discount and tax rate. LedgerLine computes
             them on the server in exact integer arithmetic, so subtotal minus
             discount plus tax equals the grand total — not approximately,
             exactly.

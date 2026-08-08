@@ -2,13 +2,15 @@
 
 /*
  * ===========================================================================
- * Tessera
+ * LedgerLine
  * ===========================================================================
  *
- * A tessera is a single exactly-cut tile in a mosaic. That is the product's
- * thesis — many precise pieces composing one exact whole — and it is also the
- * visual system: a geometric tessellation, the vernacular of Gulf architectural
- * screens, where every piece meets its neighbours with no gap.
+ * The visual system is a geometric tessellation — the vernacular of Gulf
+ * architectural screens — chosen because it is the product's thesis as
+ * geometry: many precise pieces composing one exact whole, every piece meeting
+ * its neighbours with no gap. The tiling used is provably gap-free at any size,
+ * which is the same claim the calculation engine makes about a document's
+ * totals.
  *
  * The material story: the app is dark tempered steel, and the documents you
  * make in it are paper. Parchment appears on document surfaces and nowhere

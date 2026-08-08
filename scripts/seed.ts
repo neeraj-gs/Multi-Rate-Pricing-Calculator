@@ -44,7 +44,7 @@ import { hashPassword } from '../src/lib/auth/password';
 import { createDocument, finalizeDocument } from '../src/lib/documents/service';
 import { createDocumentSchema } from '../src/lib/validation/documents';
 
-const DEMO_EMAIL = 'demo@tessera.app';
+const DEMO_EMAIL = 'demo@ledgerline.app';
 const DEMO_PASSWORD = 'demo-password-2026';
 
 const CUSTOMERS = [
@@ -117,7 +117,7 @@ async function main() {
   const user = await User.create({
     email: DEMO_EMAIL,
     name: 'Demo Reviewer',
-    company: 'Tessera Demo Co',
+    company: 'LedgerLine Demo Co',
     passwordHash: await hashPassword(DEMO_PASSWORD),
     preferences: { currency: 'AED', defaultTaxPercent: 500, documentPrefix: 'QT' },
   });

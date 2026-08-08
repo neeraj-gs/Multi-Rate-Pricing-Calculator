@@ -14,7 +14,7 @@ let server: MongoMemoryServer | null = null;
 
 export async function startTestDatabase(): Promise<void> {
   server = await MongoMemoryServer.create({ binary: { version: '7.0.14' } });
-  process.env.MONGODB_URI = server.getUri('tessera-test');
+  process.env.MONGODB_URI = server.getUri('ledgerline-test');
   process.env.AUTH_SECRET =
     process.env.AUTH_SECRET ?? 'test-secret-value-at-least-32-characters-long';
 

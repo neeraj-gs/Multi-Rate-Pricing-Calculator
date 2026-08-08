@@ -35,7 +35,7 @@ import { resolve } from 'node:path';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 const PORT = 27018;
-const DB_NAME = 'tessera';
+const DB_NAME = 'ledgerline';
 const DB_PATH = resolve(process.cwd(), '.mongo-data');
 const LOCK_FILE = resolve(DB_PATH, 'mongod.lock');
 const URI = `mongodb://127.0.0.1:${PORT}/${DB_NAME}`;

@@ -35,15 +35,15 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Tessera — pricing that ties out',
-    template: '%s · Tessera',
+    default: 'LedgerLine — pricing that ties out',
+    template: '%s · LedgerLine',
   },
   description:
     'Build quotes with per-line discounts and tax, computed server-side in exact integer arithmetic. Finalize a document and it never changes again.',
-  applicationName: 'Tessera',
+  applicationName: 'LedgerLine',
   authors: [{ name: 'Neeraj GS' }],
   openGraph: {
-    title: 'Tessera — pricing that ties out',
+    title: 'LedgerLine — pricing that ties out',
     description:
       'Per-line discounts and tax, computed server-side in exact integer arithmetic. Subtotal minus discount plus tax equals the grand total, every time.',
     type: 'website',
