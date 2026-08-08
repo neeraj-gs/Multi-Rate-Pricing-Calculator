@@ -15,6 +15,7 @@ import {
 import { ArrowDownRight, ArrowUpRight, Download, FileText, Minus } from 'lucide-react';
 
 import { fetcher } from '@/lib/api-client';
+import { formatMinor } from '@/lib/pricing';
 import { cn, formatDate, money, monthsAgoISO, todayISO } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select } from '@/components/ui/field';
@@ -484,6 +485,112 @@ function ChartTooltip({
   );
 }
 
+/**
+ * One currency's series, laid over every period the range covers.
+ *
+ * The aggregation only returns periods that have documents, so plotting it
+ * directly draws a time axis with its empty months *removed* — December next to
+ * February, reading as consecutive. Joining onto `report.periods` puts the
+ * quiet months back as zeroes, which is what actually happened.
+ *
+ * Falls back to the returned rows when the axis is absent (a range too dense to
+ * enumerate), because a compressed axis still beats no chart.
+ */
+function seriesFor(report: SummaryReport, currency: string) {
+  const found = new Map(
+    report.timeseries.filter((row) => row.currency === currency).map((row) => [row.period, row]),
+  );
+
+  const axis =
+    report.periods.length > 0
+      ? report.periods
+      : [...found.values()].map((row) => ({ period: row.period, label: row.label }));
+
+  const zero = formatMinor(0, currency);
+
+  return axis.map(({ period, label }) => {
+    const row = found.get(period);
+    return {
+      label,
+      // Chart geometry only. Every figure the reader sees comes from the
+      // formatted strings alongside it.
+      plot: row?.grandTotalMinor ?? 0,
+      grandTotal: row?.grandTotal ?? zero,
+      totalTax: row?.totalTax ?? zero,
+      totalDiscount: row?.totalDiscount ?? zero,
+      documentCount: row?.documentCount ?? 0,
+    };
+  });
+}
+
+/**
+ * A two-line time tick: the period on top, its year beneath — and the year only
+ * on the tick where it changes.
+ *
+ * Twelve "Sep 2025"-width labels do not fit across a chart this wide; recharts'
+ * answer is to drop every other one, which leaves an axis whose gridlines and
+ * labels no longer correspond. Splitting the year off makes each label short
+ * enough that all of them fit, and printing it once per year turns the repeated
+ * token into a boundary marker — the reader sees where 2026 begins instead of
+ * reading "2025" nine times.
+ */
+function TimeTick({
+  x,
+  y,
+  payload,
+  showYear,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number; index?: number };
+  showYear: (index: number) => boolean;
+}) {
+  const label = String(payload?.value ?? '');
+  const split = label.lastIndexOf(' ');
+  const head = split === -1 ? label : label.slice(0, split);
+  const year = split === -1 ? '' : label.slice(split + 1);
+  const index = payload?.index ?? 0;
+
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <text
+        textAnchor="middle"
+        dy={12}
+        fill={AXIS_TEXT}
+        fontSize={11}
+        fontFamily="var(--font-plex-mono)"
+      >
+        {head}
+      </text>
+      {year && showYear(index) ? (
+        <text
+          textAnchor="middle"
+          dy={26}
+          fill={AXIS_TEXT}
+          fontSize={10}
+          fontFamily="var(--font-plex-mono)"
+        >
+          {year}
+        </text>
+      ) : null}
+    </g>
+  );
+}
+
+/** The indices at which a new year starts — where the year is worth printing. */
+function yearBoundaries(labels: string[]): (index: number) => boolean {
+  const boundaries = new Set<number>();
+  let previous = '';
+  labels.forEach((label, index) => {
+    const year = label.slice(label.lastIndexOf(' ') + 1);
+    if (year !== previous) {
+      boundaries.add(index);
+      previous = year;
+    }
+  });
+  return (index: number) => boundaries.has(index);
+}
+
 function TrendChart({
   report,
   groupBy,
@@ -492,17 +599,8 @@ function TrendChart({
   groupBy: string;
 }) {
   const currency = report.primaryCurrency ?? 'USD';
-  const rows = report.timeseries
-    .filter((row) => row.currency === currency)
-    .map((row) => ({
-      label: row.label,
-      // Chart geometry only. Every figure the reader sees comes from the
-      // formatted strings alongside it.
-      plot: row.grandTotalMinor,
-      grandTotal: row.grandTotal,
-      totalTax: row.totalTax,
-      documentCount: row.documentCount,
-    }));
+  const rows = seriesFor(report, currency);
+  const showYear = yearBoundaries(rows.map((row) => row.label));
 
   return (
     <ChartCard
@@ -511,14 +609,16 @@ function TrendChart({
     >
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+          <BarChart data={rows} margin={{ top: 4, right: 4, bottom: 12, left: 4 }}>
             <CartesianGrid stroke={GRID} vertical={false} />
             <XAxis
               dataKey="label"
               stroke={AXIS_TEXT}
-              tick={{ fontSize: 11, fontFamily: 'var(--font-plex-mono)' }}
+              tick={<TimeTick showYear={showYear} />}
               tickLine={false}
               axisLine={{ stroke: GRID }}
+              interval={0}
+              height={38}
             />
             <YAxis
               stroke={AXIS_TEXT}
@@ -589,13 +689,11 @@ function SmallMultiple({
   colour: string;
 }) {
   const currency = report.primaryCurrency ?? 'USD';
-  const rows = report.timeseries
-    .filter((row) => row.currency === currency)
-    .map((row) => ({
-      label: row.label,
-      plot: Number(row[measure].replace(/,/g, '')),
-      display: row[measure],
-    }));
+  const rows = seriesFor(report, currency).map((row) => ({
+    label: row.label,
+    plot: Number(row[measure].replace(/,/g, '')),
+    display: row[measure],
+  }));
 
   return (
     <ChartCard title={label} meta={currency}>

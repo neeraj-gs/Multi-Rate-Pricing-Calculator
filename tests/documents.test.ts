@@ -654,6 +654,49 @@ describe('summary report', () => {
     expect(report.byCurrency).toEqual([]);
     expect(report.primaryCurrency).toBeNull();
   });
+
+  /*
+   * The aggregation returns only the periods that have documents. If a chart
+   * plots those rows directly, a month with nothing in it disappears from the
+   * axis and its neighbours are drawn touching — a gap rendered as continuity,
+   * which is the one thing a time axis must never do.
+   */
+  it('spans every period in the range, including the empty ones', async () => {
+    const userId = await makeUser();
+    await createDocument(userId, parsePayload({ issueDate: '2026-01-15' }));
+    await createDocument(userId, parsePayload({ issueDate: '2026-04-15' }));
+
+    const report = await buildSummaryReport(
+      userId,
+      reportRangeSchema.parse({ from: '2026-01-01', to: '2026-04-30', groupBy: 'month' }),
+    );
+
+    expect(report.periods.map((entry) => entry.period)).toEqual([
+      '2026-01',
+      '2026-02',
+      '2026-03',
+      '2026-04',
+    ]);
+    // February and March are absent from the aggregation — they are the axis's
+    // job to supply, not the pipeline's.
+    expect(report.timeseries.map((row) => row.period)).toEqual(['2026-01', '2026-04']);
+    expect(report.periods[0].label).toBe('Jan 2026');
+  });
+
+  it('numbers weeks by ISO year, so a range crossing New Year stays ordered', async () => {
+    const userId = await makeUser();
+    const report = await buildSummaryReport(
+      userId,
+      reportRangeSchema.parse({ from: '2026-12-28', to: '2027-01-10', groupBy: 'week' }),
+    );
+
+    // 28 Dec 2026 is a Monday, and its week belongs to ISO year 2026 — while
+    // 1 Jan 2027 falls inside that same week rather than starting a new one.
+    expect(report.periods.map((entry) => entry.period)).toEqual([
+      '2026-W53',
+      '2027-W01',
+    ]);
+  });
 });
 
 describe('listing', () => {

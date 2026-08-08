@@ -92,6 +92,19 @@ export interface SummaryReport {
     documentCount: number;
     byCurrency: Array<{ currency: string; grandTotalMinor: number }>;
   } | null;
+  /**
+   * Every period the range spans, in order — including the ones with nothing in
+   * them.
+   *
+   * `timeseries` only contains periods that have documents, because that is what
+   * a `$group` returns. Plotting those rows directly draws a time axis that
+   * skips its empty months: a book with nothing issued in January renders
+   * "Dec 2025, Feb 2026" side by side, which reads as *no gap* rather than as a
+   * quiet month, and silently compresses the shape of the trend. Charts join
+   * onto this axis so a period with no documents is drawn as zero.
+   */
+  periods: Array<{ period: string; label: string }>;
+
   timeseries: Array<{
     period: string;
     label: string;
@@ -306,6 +319,7 @@ export async function buildSummaryReport(
         grandTotalMinor: row.grandTotalMinor as number,
       })),
     },
+    periods: periodAxis(query.from, query.to, query.groupBy),
     timeseries: timeseriesRows.map((row) => {
       const currency = row._id.currency as string;
       const period = row._id.period as string;
@@ -349,6 +363,71 @@ const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
+
+/**
+ * The complete, ordered list of periods a range covers.
+ *
+ * Keys are generated to match `PERIOD_FORMAT` exactly — the same strings
+ * `$dateToString` produces — so the join in the UI is a plain lookup rather than
+ * a re-parse. Everything is computed in UTC, for the reason given at the
+ * pipeline: a period boundary has to mean the same thing to every viewer.
+ *
+ * Capped at the same 400 rows the timeseries pipeline is capped at. Beyond that
+ * the axis is denser than the pixels available anyway, and returning the empty
+ * array lets the caller fall back to plotting the rows it has.
+ */
+const MAX_PERIODS = 400;
+
+function periodAxis(
+  from: Date,
+  to: Date,
+  groupBy: ReportRangeQuery['groupBy'],
+): Array<{ period: string; label: string }> {
+  const periods: string[] = [];
+  const cursor = new Date(
+    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()),
+  );
+  const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+
+  while (cursor <= end && periods.length <= MAX_PERIODS) {
+    if (groupBy === 'month') {
+      periods.push(
+        `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`,
+      );
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
+    } else if (groupBy === 'week') {
+      periods.push(isoWeekKey(cursor));
+      cursor.setUTCDate(cursor.getUTCDate() + 7);
+    } else {
+      periods.push(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+  }
+
+  if (periods.length > MAX_PERIODS) return [];
+  return periods.map((period) => ({ period, label: formatPeriodLabel(period, groupBy) }));
+}
+
+/**
+ * ISO-8601 week key, `%G-W%V` — week-numbering year and week number.
+ *
+ * The week-numbering year is not always the calendar year: 1 Jan 2027 falls in
+ * week 53 of 2026. Stepping to the nearest Thursday first is the standard way to
+ * resolve both at once, because a week's Thursday is always in its own
+ * week-numbering year.
+ */
+function isoWeekKey(date: Date): string {
+  const thursday = new Date(date.getTime());
+  // Sunday is 0; treat it as day 7 so the week runs Monday–Sunday.
+  const isoDay = thursday.getUTCDay() === 0 ? 7 : thursday.getUTCDay();
+  thursday.setUTCDate(thursday.getUTCDate() + 4 - isoDay);
+
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((thursday.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+  return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
 
 function formatPeriodLabel(period: string, groupBy: string): string {
   if (groupBy === 'month') {
