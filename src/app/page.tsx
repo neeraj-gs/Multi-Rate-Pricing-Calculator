@@ -180,14 +180,11 @@ function Proof() {
         </p>
       </div>
 
+      {/* The derivation used to be repeated in a caption here; it now lives
+          inside the sheet, beside the totals it explains. */}
       <div className="mt-14">
         <ProofLedger />
       </div>
-
-      <p className="mx-auto mt-7 max-w-2xl text-center font-mono text-xs leading-relaxed text-quill-700">
-        450.00 − 40.00 + 11.50 = 421.50 · and the three line totals sum to
-        421.50 · the same number by construction, not by luck
-      </p>
     </Section>
   );
 }

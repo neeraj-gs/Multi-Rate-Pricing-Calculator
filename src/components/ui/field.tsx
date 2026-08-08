@@ -74,8 +74,10 @@ Textarea.displayName = 'Textarea';
 
 export const Select = React.forwardRef<
   HTMLSelectElement,
-  React.SelectHTMLAttributes<HTMLSelectElement>
->(({ className, children, ...props }, ref) => (
+  React.SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }
+>(({ className, children, invalid, ...props }, ref) => (
+  // `invalid` is destructured, not spread: `Field` clones its child with it,
+  // and forwarding a non-standard boolean onto a DOM node makes React warn.
   <select
     ref={ref}
     className={cn(

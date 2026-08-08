@@ -138,23 +138,75 @@ function Step({
 
 /* --- Mockups, built from the real tokens ---------------------------------- */
 
+/**
+ * A window frame, so each mockup reads as a screen of the product rather than
+ * as a floating fragment of UI.
+ */
+function Frame({
+  chrome,
+  children,
+  padded = true,
+}: {
+  chrome: React.ReactNode;
+  children: React.ReactNode;
+  padded?: boolean;
+}) {
+  return (
+    <div className="overflow-hidden rounded-sheet border border-ink-700 bg-ink-950 shadow-lift">
+      <div className="flex items-center gap-3 border-b border-ink-800 bg-ink-900 px-4 py-2.5">
+        {chrome}
+      </div>
+      <div className={padded ? 'p-4' : ''}>{children}</div>
+    </div>
+  );
+}
+
+function DocChrome({ status }: { status: 'draft' | 'finalized' }) {
+  return (
+    <>
+      <span className="font-mono text-[0.6875rem] text-brass-500">QT-0042</span>
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[0.5625rem] uppercase tracking-[0.12em] ${
+          status === 'finalized'
+            ? 'border-verdigris-700 bg-verdigris-500/12 text-verdigris-300'
+            : 'border-ink-600 bg-ink-800 text-quill-500'
+        }`}
+      >
+        <span
+          aria-hidden
+          className={`size-1 rounded-full ${
+            status === 'finalized' ? 'bg-verdigris-400' : 'bg-quill-700'
+          }`}
+        />
+        {status}
+      </span>
+    </>
+  );
+}
+
 function CreateVisual() {
   return (
-    <div className="sheet space-y-3.5 p-5">
-      <MockField label="Title" value="Q3 platform renewal" />
-      <div className="grid gap-3.5 sm:grid-cols-2">
-        <MockField label="Customer" value="Acme Trading LLC" />
-        <MockField label="Issue date" value="08 / 08 / 2026" />
-      </div>
-      <div className="grid gap-3.5 sm:grid-cols-2">
-        <MockField label="Currency" value="AED" mono />
-        <div className="flex items-end">
-          <span className="rounded-[2px] bg-ink-900 px-3 py-1.5 text-xs font-medium text-parchment-100">
+    <Frame
+      chrome={
+        <span className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-quill-700">
+          New document
+        </span>
+      }
+    >
+      <div className="sheet space-y-4 p-5">
+        <MockField label="Title" value="Q3 platform renewal" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <MockField label="Customer" value="Acme Trading LLC" />
+          <MockField label="Issue date" value="08 / 08 / 2026" mono />
+        </div>
+        <div className="grid items-end gap-4 sm:grid-cols-2">
+          <MockField label="Currency" value="AED" mono hint="fixed at creation" />
+          <span className="rounded-[2px] bg-brass-500 px-3 py-2 text-center text-[0.8125rem] font-semibold text-ink-950">
             Create document
           </span>
         </div>
       </div>
-    </div>
+    </Frame>
   );
 }
 
@@ -162,18 +214,25 @@ function MockField({
   label,
   value,
   mono,
+  hint,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  hint?: string;
 }) {
   return (
     <div>
-      <p className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-ink-500">
-        {label}
-      </p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-ink-500">
+          {label}
+        </p>
+        {hint ? (
+          <p className="font-mono text-[0.5625rem] text-parchment-400">{hint}</p>
+        ) : null}
+      </div>
       <p
-        className={`mt-1 rounded-[2px] border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 text-[0.8125rem] text-ink-900 ${
+        className={`mt-1.5 rounded-[2px] border border-parchment-300 bg-parchment-50 px-2.5 py-2 text-[0.8125rem] text-ink-900 ${
           mono ? 'tabular' : ''
         }`}
       >
@@ -184,115 +243,180 @@ function MockField({
 }
 
 function LinesVisual() {
+  const rows = [
+    ['Widget A', '2', '100.00', '10%', '5%', '189.00'],
+    ['Widget B', '1', '50.00', '—', '5%', '52.50'],
+    ['Service fee', '1', '200.00', '$20', '—', '180.00'],
+  ];
+
   return (
-    <div className="grid gap-3 sm:grid-cols-[1.5fr_1fr]">
-      <div className="sheet overflow-hidden">
-        <div className="border-b border-parchment-300 px-4 py-2 font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-ink-500">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-3">
-            <span>Description</span>
-            <span>Disc.</span>
-            <span className="text-right">Total</span>
+    <Frame chrome={<DocChrome status="draft" />} padded={false}>
+      {/*
+        Stacked, not side by side. A six-column table and a totals panel do not
+        both fit in the ~490px this mockup gets: as columns, whichever one lost
+        the negotiation clipped its own figures. Stacking is also what the real
+        editor does at this width.
+      */}
+      <div className="bg-ink-950">
+        <div className="p-4 pb-0">
+          <div className="sheet overflow-hidden">
+            <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_3rem_2.25rem_1.75rem_3.25rem] gap-2 border-b border-parchment-300 px-3 py-2 font-mono text-[0.5rem] uppercase tracking-[0.1em] text-ink-500">
+              <span>Description</span>
+              <span className="text-right">Qty</span>
+              <span className="text-right">Unit</span>
+              <span className="text-right">Disc</span>
+              <span className="text-right">Tax</span>
+              <span className="text-right">Total</span>
+            </div>
+            {rows.map(([name, qty, unit, disc, tax, total]) => (
+              <div
+                key={name}
+                className="grid grid-cols-[minmax(0,1fr)_1.75rem_3rem_2.25rem_1.75rem_3.25rem] gap-2 border-b border-parchment-300/60 px-3 py-2 text-[0.75rem] text-ink-800 last:border-0"
+              >
+                <span className="truncate">{name}</span>
+                <span className="tabular text-right">{qty}</span>
+                <span className="tabular text-right">{unit}</span>
+                <span className="tabular text-right text-ink-500">{disc}</span>
+                <span className="tabular text-right text-ink-500">{tax}</span>
+                <span className="tabular text-right font-medium">{total}</span>
+              </div>
+            ))}
           </div>
         </div>
-        {[
-          ['Widget A', '10%', '189.00'],
-          ['Widget B', '—', '52.50'],
-          ['Service fee', '$20', '180.00'],
-        ].map(([name, discount, total]) => (
-          <div
-            key={name}
-            className="grid grid-cols-[1fr_auto_auto] gap-3 border-b border-parchment-300/60 px-4 py-2 text-[0.8125rem] text-ink-800 last:border-0"
-          >
-            <span className="truncate">{name}</span>
-            <span className="tabular text-ink-500">{discount}</span>
-            <span className="tabular text-right font-medium">{total}</span>
-          </div>
-        ))}
-      </div>
 
-      <div className="rounded-sheet border border-ink-700 bg-ink-850 p-4">
-        <p className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-quill-700">
-          Grand total
-        </p>
-        <p className="double-rule tabular mt-2 inline-block text-lg font-semibold text-brass-400">
-          $421.50
-        </p>
-        <p className="mt-4 flex items-center gap-1.5 font-mono text-[0.5625rem] text-quill-700">
-          <span className="size-1.5 rounded-full bg-verdigris-400" />
-          computed server-side · 54ms
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-4 p-4">
+          <p className="flex items-center gap-1.5 font-mono text-[0.5625rem] text-quill-700">
+            <span aria-hidden className="size-1.5 rounded-full bg-verdigris-400" />
+            computed server-side · 54ms
+          </p>
+
+          <dl className="flex flex-wrap items-end gap-x-6 gap-y-2">
+            {[
+              ['Subtotal', '$450.00'],
+              ['Discount', '−$40.00'],
+              ['Tax', '+$11.50'],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="whitespace-nowrap font-mono text-[0.5rem] uppercase tracking-[0.14em] text-quill-700">
+                  {label}
+                </dt>
+                <dd className="tabular mt-0.5 whitespace-nowrap text-[0.75rem] text-quill-300">
+                  {value}
+                </dd>
+              </div>
+            ))}
+            <div>
+              <dt className="whitespace-nowrap font-mono text-[0.5rem] uppercase tracking-[0.14em] text-quill-500">
+                Grand total
+              </dt>
+              <dd className="double-rule tabular mt-0.5 inline-block whitespace-nowrap text-base font-semibold text-brass-400">
+                $421.50
+              </dd>
+            </div>
+          </dl>
+        </div>
       </div>
-    </div>
+    </Frame>
   );
 }
 
 function FinalizeVisual() {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2.5 rounded-sheet border border-verdigris-700/60 bg-verdigris-500/[0.07] px-4 py-3">
-        <FileLock2 className="size-4 shrink-0 text-verdigris-400" />
+    <Frame chrome={<DocChrome status="finalized" />}>
+      <div className="mb-4 flex items-center gap-2.5 rounded-sheet border border-verdigris-700/60 bg-verdigris-500/[0.07] px-3.5 py-2.5">
+        <FileLock2 className="size-3.5 shrink-0 text-verdigris-400" />
         <p className="text-xs leading-snug text-verdigris-300">
-          Finalized 8 Aug 2026. This document is read-only — duplicate it to make
-          changes.
+          Finalized 8 Aug 2026 — read-only. Duplicate it to make changes.
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-sheet border border-ink-700 bg-ink-950">
-        <div className="border-b border-ink-800 px-4 py-2 font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-quill-700">
-          What the API does next
-        </div>
-        <div className="space-y-1.5 px-4 py-3 font-mono text-[0.6875rem]">
-          {[
-            ['PATCH  /documents/:id', '409'],
-            ['POST   /documents/:id/lines', '409'],
-            ['DELETE /documents/:id', '409'],
-            ['GET    /documents/:id', '200'],
-          ].map(([call, status]) => (
-            <div key={call} className="flex items-baseline justify-between gap-4">
-              <span className="truncate text-quill-500">{call}</span>
-              <span
-                className={
-                  status === '409' ? 'text-oxblood-300' : 'text-verdigris-300'
-                }
-              >
+      <p className="mb-2 font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-quill-700">
+        What the API does from here
+      </p>
+      <div className="space-y-1 font-mono text-[0.6875rem]">
+        {[
+          ['PATCH', '/documents/:id', '409'],
+          ['POST', '/documents/:id/lines', '409'],
+          ['DELETE', '/documents/:id', '409'],
+          ['POST', '/documents/:id/duplicate', '201'],
+          ['GET', '/documents/:id', '200'],
+        ].map(([method, path, status]) => {
+          const refused = status === '409';
+          return (
+            <div key={path + method} className="flex items-baseline gap-3">
+              <span className="w-14 shrink-0 text-quill-700">{method}</span>
+              <span className="min-w-0 flex-1 truncate text-quill-500">{path}</span>
+              <span className={refused ? 'text-oxblood-300' : 'text-verdigris-300'}>
                 {status}
               </span>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
-    </div>
+    </Frame>
   );
 }
 
 function ReportVisual() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {[
-        { currency: 'AED', total: '362,618.88', count: '6 documents' },
-        { currency: 'USD', total: '442,996.50', count: '3 documents' },
-      ].map((row) => (
-        <div
-          key={row.currency}
-          className="rounded-sheet border border-ink-700 bg-ink-850 p-4"
-        >
-          <div className="flex items-baseline justify-between">
-            <span className="font-display text-sm text-quill-100">
-              {row.currency}
-            </span>
-            <span className="font-mono text-[0.5625rem] text-quill-700">
-              {row.count}
-            </span>
+    <Frame
+      chrome={
+        <>
+          <span className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-quill-700">
+            Summary
+          </span>
+          <span className="tabular ml-auto text-[0.6875rem] text-quill-500">
+            1 Mar – 31 Aug 2026
+          </span>
+        </>
+      }
+    >
+      <div className="mb-4 grid grid-cols-3 gap-px overflow-hidden rounded-sheet border border-ink-700 bg-ink-700">
+        {[
+          ['Documents', '10'],
+          ['Finalized', '9'],
+          ['Line items', '32'],
+        ].map(([label, value]) => (
+          <div key={label} className="bg-ink-900 px-3 py-2.5">
+            <p className="font-mono text-[0.5rem] uppercase tracking-[0.14em] text-quill-700">
+              {label}
+            </p>
+            <p className="tabular mt-1 text-sm text-quill-100">{value}</p>
           </div>
-          <p className="double-rule tabular mt-3 inline-block text-base font-semibold text-brass-400">
-            {row.total}
-          </p>
-        </div>
-      ))}
-      <p className="font-mono text-[0.625rem] leading-relaxed text-quill-700 sm:col-span-2">
+        ))}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {[
+          { currency: 'AED', total: '362,618.88', tax: '16,941.38', count: 6 },
+          { currency: 'USD', total: '442,996.50', tax: '21,086.50', count: 3 },
+        ].map((row) => (
+          <div
+            key={row.currency}
+            className="rounded-sheet border border-ink-700 bg-ink-900 p-3.5"
+          >
+            <div className="flex items-baseline justify-between">
+              <span className="font-display text-sm text-quill-100">
+                {row.currency}
+              </span>
+              <span className="font-mono text-[0.5625rem] text-quill-700">
+                {row.count} documents
+              </span>
+            </div>
+            <p className="double-rule tabular mt-3 inline-block text-base font-semibold text-brass-400">
+              {row.total}
+            </p>
+            <p className="tabular mt-3 text-[0.6875rem] text-quill-700">
+              of which tax {row.tax}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 font-mono text-[0.625rem] leading-relaxed text-quill-700">
         Never summed together — adding AED to USD produces a number that means
         nothing.
       </p>
-    </div>
+    </Frame>
   );
 }

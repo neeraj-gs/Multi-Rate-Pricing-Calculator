@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
 import { getSession } from '@/lib/auth/session';
-import { connectToDatabase } from '@/lib/db';
+import { connectToDatabase, User } from '@/lib/db';
+import { formatPercent } from '@/lib/pricing';
 import { loadOwnedDocument } from '@/lib/documents/service';
 import { serializeDocument } from '@/lib/documents/serialize';
 import { DocumentEditor } from '@/components/documents/DocumentEditor';
@@ -49,6 +50,18 @@ export default async function DocumentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const document = await load(id);
-  return <DocumentEditor initial={document} />;
+  const session = await getSession();
+  const [document, user] = await Promise.all([
+    load(id),
+    User.findById(session!.sub).lean(),
+  ]);
+
+  return (
+    <DocumentEditor
+      initial={document}
+      // Newly added lines start at the account's default tax rate, so the
+      // common case is typing a description and a price and nothing else.
+      defaultTaxPercent={formatPercent(user?.preferences?.defaultTaxPercent ?? 0)}
+    />
+  );
 }

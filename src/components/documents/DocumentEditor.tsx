@@ -62,7 +62,8 @@ function toDraftLines(document: ApiDocument): DraftLine[] {
   }));
 }
 
-function blankLine(): DraftLine {
+/** A fresh row, pre-filled with the account's default tax rate. */
+function blankLine(defaultTaxPercent: string): DraftLine {
   return {
     key: `new-${crypto.randomUUID()}`,
     description: '',
@@ -70,11 +71,18 @@ function blankLine(): DraftLine {
     unitPrice: '',
     discountType: 'none',
     discountValue: '',
-    taxPercent: '',
+    taxPercent: defaultTaxPercent === '0' ? '' : defaultTaxPercent,
   };
 }
 
-export function DocumentEditor({ initial }: { initial: ApiDocument }) {
+export function DocumentEditor({
+  initial,
+  defaultTaxPercent = '0',
+}: {
+  initial: ApiDocument;
+  /** From the account's preferences; applied to newly added lines. */
+  defaultTaxPercent?: string;
+}) {
   const router = useRouter();
 
   const [document, setDocument] = React.useState(initial);
@@ -155,8 +163,8 @@ export function DocumentEditor({ initial }: { initial: ApiDocument }) {
   }, []);
 
   const addLine = React.useCallback(() => {
-    setLines((current) => [...current, blankLine()]);
-  }, []);
+    setLines((current) => [...current, blankLine(defaultTaxPercent)]);
+  }, [defaultTaxPercent]);
 
   const removeLine = React.useCallback((key: string) => {
     setLines((current) => current.filter((line) => line.key !== key));

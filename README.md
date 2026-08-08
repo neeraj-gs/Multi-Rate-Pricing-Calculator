@@ -66,8 +66,14 @@ npm run db:local
 ```
 
 That starts a real `mongod` on port 27018 with a persistent data directory,
-using the binary `mongodb-memory-server` already ships for the test suite. It
-prints the connection string to paste into `.env.local`. Nothing to install.
+using the binary `mongodb-memory-server` already ships for the test suite. The
+connection string it prints is already the default in `.env.example`. Nothing to
+install.
+
+Run it twice and it tells you it is already running instead of failing; if a
+previous run was killed without cleaning up, it clears the stale lock and
+carries on. Both cases otherwise surface as the same unreadable `DBPathInUse`
+stack trace.
 
 **3. Seed and run**
 

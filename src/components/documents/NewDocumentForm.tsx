@@ -48,7 +48,6 @@ export function NewDocumentForm({
 
     const form = new FormData(event.currentTarget);
     const currency = String(form.get('currency'));
-    const tax = defaultTaxPercent === '0' ? null : defaultTaxPercent;
 
     try {
       const { document } = await api.post<{ document: ApiDocument }>(
@@ -61,6 +60,15 @@ export function NewDocumentForm({
           },
           issueDate: String(form.get('issueDate')),
           currency,
+          /*
+           * A new document starts with no lines.
+           *
+           * It used to send one blank placeholder row, which the schema
+           * rejected — a line must have a description — so creating anything
+           * other than the worked example failed with a 400. An empty document
+           * is the honest representation anyway: you add lines in the editor,
+           * and `finalize` is what insists there is at least one.
+           */
           lines: withSample
             ? [
                 {
@@ -83,14 +91,7 @@ export function NewDocumentForm({
                   discount: { type: 'fixed', value: '20.00' },
                 },
               ]
-            : [
-                {
-                  description: '',
-                  quantity: '1',
-                  unitPrice: '0.00',
-                  taxPercent: tax,
-                },
-              ],
+            : [],
         },
         idempotencyKey,
       );
@@ -188,6 +189,13 @@ export function NewDocumentForm({
             </span>
           </label>
         </div>
+
+        {defaultTaxPercent !== '0' ? (
+          <p className="mt-4 font-mono text-[0.6875rem] text-quill-700">
+            New lines will start at {defaultTaxPercent}% tax — your default, from
+            Settings.
+          </p>
+        ) : null}
 
         <div className="mt-8 flex items-center gap-3">
           <Button type="submit" variant="primary" size="lg" loading={pending}>

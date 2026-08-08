@@ -142,6 +142,42 @@ describe('creating a document', () => {
     expect(new Set(numbers).size).toBe(10);
   });
 
+  it('creates a document with no lines yet', async () => {
+    // The normal way to start: create the document, then add lines in the
+    // editor. This is a regression test — the new-document form used to send a
+    // single blank placeholder line, which the schema rejected because a line
+    // must have a description, so every create that was not the worked example
+    // failed with a 400. Every other test happened to supply descriptions,
+    // which is exactly why it went unnoticed.
+    const userId = await makeUser();
+    const document = await createDocument(userId, parsePayload({ lines: [] }));
+
+    expect(document.lines).toEqual([]);
+    expect(document.status).toBe('draft');
+    expect(document.totals).toMatchObject({
+      subtotal: '0.00',
+      totalDiscount: '0.00',
+      totalTax: '0.00',
+      grandTotal: '0.00',
+    });
+  });
+
+  it('rejects a line with no description', async () => {
+    const userId = await makeUser();
+    await expectApiError(
+      () =>
+        Promise.resolve().then(() =>
+          createDocumentSchema.parse({
+            ...SAMPLE_PAYLOAD,
+            lines: [{ description: '', quantity: 1, unitPrice: '10.00' }],
+          }),
+        ),
+      'VALIDATION_FAILED',
+      400,
+    );
+    expect(userId).toBeTruthy();
+  });
+
   it('rejects a fixed discount that exceeds its line subtotal', async () => {
     const userId = await makeUser();
     const error = await expectApiError(
