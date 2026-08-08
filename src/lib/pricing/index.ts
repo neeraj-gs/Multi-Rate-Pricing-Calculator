@@ -30,6 +30,13 @@ export {
   QUANTITY_SCALE,
   SUPPORTED_CURRENCIES,
 } from './money';
+export {
+  convertAndFormat,
+  convertMinor,
+  isConvertible,
+  rateLabel,
+  RATES_AS_OF,
+} from './exchange';
 export type {
   CalculatedDocument,
   DecimalInput,

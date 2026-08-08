@@ -6,7 +6,10 @@ import useSWR from 'swr';
 import { ChevronLeft, ChevronRight, FileText, Plus, Search } from 'lucide-react';
 
 import { fetcher } from '@/lib/api-client';
+import { convertAndFormat } from '@/lib/pricing';
+import { isNative } from '@/lib/display-currency';
 import { cn, formatDate, money } from '@/lib/utils';
+import { useDisplayCurrency } from '@/components/app/DisplayCurrency';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { EmptyState, Skeleton, StatusBadge } from '@/components/ui/primitives';
@@ -34,6 +37,26 @@ const SORTS = [
  * about how many results exist.
  */
 export function DocumentsList() {
+  /*
+   * Only the grand total converts.
+   *
+   * Tax stays in the document's own currency, beside a converted total, which
+   * would read as an inconsistency — so the column that answers "how big is
+   * this" moves to the common unit and the rest of the row keeps the
+   * document's own terms. The number column and the detail page always show
+   * the document exactly as it was priced.
+   */
+  const { value: display } = useDisplayCurrency();
+  const converting = !isNative(display);
+
+  const shown = React.useCallback(
+    (minor: number, currency: string, formatted: string) =>
+      converting
+        ? money(convertAndFormat(minor, currency, display), display)
+        : money(formatted, currency),
+    [converting, display],
+  );
+
   const [status, setStatus] = React.useState<string>('all');
   const [sort, setSort] = React.useState<string>('-issueDate');
   const [search, setSearch] = React.useState('');
@@ -211,7 +234,7 @@ export function DocumentsList() {
                       {money(document.totalTax, document.currency)}
                     </td>
                     <td className="tabular px-4 py-3 text-right text-sm font-medium text-quill-100">
-                      {money(document.grandTotal, document.currency)}
+                      {shown(document.grandTotalMinor, document.currency, document.grandTotal)}
                     </td>
                   </tr>
                 ))}

@@ -15,7 +15,8 @@ import {
 import { ArrowDownRight, ArrowUpRight, Download, FileText, Minus } from 'lucide-react';
 
 import { fetcher } from '@/lib/api-client';
-import { formatMinor } from '@/lib/pricing';
+import { convertAndFormat, formatMinor } from '@/lib/pricing';
+import { useDisplayCurrency } from '@/components/app/DisplayCurrency';
 import { cn, formatDate, money, monthsAgoISO, todayISO } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select } from '@/components/ui/field';
@@ -64,7 +65,12 @@ export function ReportView() {
   const [status, setStatus] = React.useState('all');
   const [groupBy, setGroupBy] = React.useState('month');
 
-  const query = new URLSearchParams({ from, to, status, groupBy });
+  // The app-wide display currency is part of the request, not a post-processing
+  // step here: converting in the browser would mean the CSV and the PDF — which
+  // are produced on the server — could disagree with the screen.
+  const { value: display } = useDisplayCurrency();
+
+  const query = new URLSearchParams({ from, to, status, groupBy, display });
   const invalidRange = from > to;
 
   const { data, isLoading } = useSWR<SummaryReport>(
@@ -83,15 +89,40 @@ export function ReportView() {
     { keepPreviousData: true },
   );
 
-  const primary = data?.byCurrency[0] ?? null;
+  const converted = data?.display ?? null;
   const currencyOrder = React.useMemo(
     () => (data?.byCurrency ?? []).map((row) => row.currency),
     [data],
   );
 
-  const previousPrimary = data?.comparison?.byCurrency.find(
-    (row) => row.currency === primary?.currency,
+  /*
+   * The headline figures come from whichever view is in force.
+   *
+   * Converted, they cover the whole book in one currency. Unconverted, they are
+   * the currency with the most documents in it and the rest are broken out
+   * below — the same shape either way, so the rest of this component does not
+   * branch on which one it got.
+   */
+  const nativePrimary = data?.byCurrency[0] ?? null;
+  const previousNative = data?.comparison?.byCurrency.find(
+    (row) => row.currency === nativePrimary?.currency,
   );
+
+  const primary = converted
+    ? {
+        currency: converted.currency,
+        grandTotal: converted.grandTotal,
+        totalTax: converted.totalTax,
+        totalDiscount: converted.totalDiscount,
+        effectiveTaxRatePercent: converted.effectiveTaxRatePercent,
+        discountRatePercent: converted.discountRatePercent,
+        amounts: converted.amounts,
+      }
+    : nativePrimary;
+
+  const previousGrandTotalMinor = converted
+    ? converted.comparison?.grandTotalMinor
+    : previousNative?.grandTotalMinor;
 
   return (
     <div className="px-6 py-8 lg:px-10">
@@ -134,11 +165,14 @@ export function ReportView() {
         <Kpi
           label="Grand total"
           value={primary ? money(primary.grandTotal, primary.currency) : null}
-          caption={primary ? `${primary.currency} · in range` : 'No documents'}
-          delta={delta(
-            primary?.amounts.grandTotalMinor,
-            previousPrimary?.grandTotalMinor,
-          )}
+          caption={
+            primary
+              ? converted
+                ? `${primary.currency} · all currencies`
+                : `${primary.currency} · in range`
+              : 'No documents'
+          }
+          delta={delta(primary?.amounts.grandTotalMinor, previousGrandTotalMinor)}
           settled
           loading={isLoading}
         />
@@ -166,7 +200,13 @@ export function ReportView() {
         />
       </div>
 
-      {data && data.byCurrency.length > 1 ? (
+      {converted && converted.converted ? (
+        <p className="mt-3 font-mono text-xs text-quill-700">
+          Converted to {converted.currency} at rates of {converted.ratesAsOf} ·{' '}
+          {converted.sources.map((source) => source.rate).join(' · ')}. Each
+          currency is also broken out below, unconverted.
+        </p>
+      ) : data && data.byCurrency.length > 1 ? (
         <p className="mt-3 font-mono text-xs text-quill-700">
           Headline figures show {primary?.currency}. Every currency is broken out
           below — they are never added together.
@@ -224,7 +264,7 @@ export function ReportView() {
 
       {/* The rows behind the numbers */}
       {documents && documents.data.length > 0 ? (
-        <DocumentsInRange documents={documents} />
+        <DocumentsInRange documents={documents} display={converted?.currency ?? null} />
       ) : null}
 
       <p className="mt-8 max-w-3xl font-mono text-xs leading-relaxed text-quill-700">
@@ -496,10 +536,28 @@ function ChartTooltip({
  * Falls back to the returned rows when the axis is absent (a range too dense to
  * enumerate), because a compressed axis still beats no chart.
  */
+/**
+ * The currency every chart is drawn in.
+ *
+ * With a display currency chosen that is the whole book in one unit; without
+ * one it is the currency holding the most documents, and the other currencies
+ * appear in their own cards rather than on a shared axis.
+ */
+function chartCurrency(report: SummaryReport): string {
+  return report.display?.currency ?? report.primaryCurrency ?? 'USD';
+}
+
 function seriesFor(report: SummaryReport, currency: string) {
-  const found = new Map(
-    report.timeseries.filter((row) => row.currency === currency).map((row) => [row.period, row]),
-  );
+  // With a display currency in force the series is already one row per period,
+  // summed across every currency. Without one it is per (period, currency) and
+  // the chart plots the leading currency only, because the alternative would be
+  // adding dirhams to dollars on a single axis.
+  const rows =
+    report.display && report.display.currency === currency
+      ? report.display.timeseries
+      : report.timeseries.filter((row) => row.currency === currency);
+
+  const found = new Map(rows.map((row) => [row.period, row]));
 
   const axis =
     report.periods.length > 0
@@ -598,7 +656,7 @@ function TrendChart({
   report: SummaryReport;
   groupBy: string;
 }) {
-  const currency = report.primaryCurrency ?? 'USD';
+  const currency = chartCurrency(report);
   const rows = seriesFor(report, currency);
   const showYear = yearBoundaries(rows.map((row) => row.label));
 
@@ -688,7 +746,7 @@ function SmallMultiple({
   label: string;
   colour: string;
 }) {
-  const currency = report.primaryCurrency ?? 'USD';
+  const currency = chartCurrency(report);
   const rows = seriesFor(report, currency).map((row) => ({
     label: row.label,
     plot: Number(row[measure].replace(/,/g, '')),
@@ -725,8 +783,12 @@ function SmallMultiple({
 
 /** Committed value versus still in progress — what counts alone cannot show. */
 function StatusComposition({ report }: { report: SummaryReport }) {
-  const currency = report.primaryCurrency ?? 'USD';
-  const rows = report.byStatus.filter((row) => row.currency === currency);
+  const currency = chartCurrency(report);
+  // Converted, the split covers every document; otherwise only the currency the
+  // rest of the headline figures are in.
+  const rows = report.display
+    ? report.display.byStatus
+    : report.byStatus.filter((row) => row.currency === currency);
   const finalized = rows.find((row) => row.status === 'finalized');
   const draft = rows.find((row) => row.status === 'draft');
 
@@ -779,32 +841,60 @@ function CurrencyMix({
 }) {
   if (report.byCurrency.length < 2) return null;
 
-  // Share of *document count*, not of value — values in different currencies
-  // cannot be summed, so a value share would be a meaningless denominator.
-  const total = report.documentCount;
+  /*
+   * Unconverted, the only honest denominator is document *count*: values in
+   * different currencies cannot be summed, so a value share would be dividing
+   * by a number that means nothing.
+   *
+   * Converted, they can — and share of value is the more useful question,
+   * because four JPY documents and four KWD documents are not the same weight
+   * of business. The chart switches denominator with the view, and the meta
+   * label says which one is in force rather than leaving it to be inferred.
+   */
+  const converted = report.display;
+
+  const slices = converted
+    ? converted.sources.map((source) => ({
+        currency: source.currency,
+        weight: source.grandTotalMinor,
+        value: money(source.grandTotal, converted.currency),
+        count: source.documentCount,
+      }))
+    : report.byCurrency.map((row) => ({
+        currency: row.currency,
+        weight: row.documentCount,
+        value: money(row.grandTotal, row.currency),
+        count: row.documentCount,
+      }));
+
+  const total = slices.reduce((sum, slice) => sum + slice.weight, 0);
+  if (total === 0) return null;
 
   return (
-    <ChartCard title="Currency mix" meta="by document count">
+    <ChartCard
+      title="Currency mix"
+      meta={converted ? `by value · ${converted.currency}` : 'by document count'}
+    >
       <div className="flex h-3 gap-0.5 overflow-hidden rounded-full">
-        {report.byCurrency.map((row) => (
+        {slices.map((slice) => (
           <div
-            key={row.currency}
+            key={slice.currency}
             style={{
-              width: `${(row.documentCount / total) * 100}%`,
-              background: currencyColour(row.currency, order),
+              width: `${(slice.weight / total) * 100}%`,
+              background: currencyColour(slice.currency, order),
             }}
           />
         ))}
       </div>
 
       <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {report.byCurrency.map((row) => (
+        {slices.map((slice) => (
           <Legend
-            key={row.currency}
-            swatch={currencyColour(row.currency, order)}
-            term={row.currency}
-            value={money(row.grandTotal, row.currency)}
-            detail={`${row.documentCount} · ${((row.documentCount / total) * 100).toFixed(0)}%`}
+            key={slice.currency}
+            swatch={currencyColour(slice.currency, order)}
+            term={slice.currency}
+            value={slice.value}
+            detail={`${slice.count} · ${((slice.weight / total) * 100).toFixed(0)}%`}
           />
         ))}
       </dl>
@@ -943,8 +1033,12 @@ function Row({
 
 /** Ranked magnitude — horizontal bars, direct-labelled, no legend needed. */
 function TopCustomers({ report }: { report: SummaryReport }) {
-  const currency = report.primaryCurrency ?? 'USD';
-  const rows = report.topCustomers.filter((row) => row.currency === currency);
+  const currency = chartCurrency(report);
+  // A customer billed in two currencies is one customer — but only once the
+  // amounts share a unit, so the merge happens on the converted view alone.
+  const rows = report.display
+    ? report.display.topCustomers
+    : report.topCustomers.filter((row) => row.currency === currency);
   if (rows.length === 0) return null;
 
   const largest = Math.max(...rows.map((row) => row.grandTotalMinor));
@@ -981,7 +1075,14 @@ function TopCustomers({ report }: { report: SummaryReport }) {
   );
 }
 
-function DocumentsInRange({ documents }: { documents: PaginatedDocuments }) {
+function DocumentsInRange({
+  documents,
+  display,
+}: {
+  documents: PaginatedDocuments;
+  /** The display currency, or null to show each document in its own. */
+  display: string | null;
+}) {
   return (
     <ChartCard
       title="Largest documents in range"
@@ -1018,7 +1119,16 @@ function DocumentsInRange({ documents }: { documents: PaginatedDocuments }) {
                   <StatusBadge status={document.status} />
                 </td>
                 <td className="tabular py-2.5 pl-4 text-right text-quill-100">
-                  {money(document.grandTotal, document.currency)}
+                  {display
+                    ? money(
+                        convertAndFormat(
+                          document.grandTotalMinor,
+                          document.currency,
+                          display,
+                        ),
+                        display,
+                      )
+                    : money(document.grandTotal, document.currency)}
                 </td>
               </tr>
             ))}

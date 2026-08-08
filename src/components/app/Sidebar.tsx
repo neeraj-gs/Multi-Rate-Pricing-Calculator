@@ -18,6 +18,7 @@ import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Mark } from '@/components/brand';
+import { DisplayCurrencySwitcher } from './DisplayCurrency';
 
 const NAV = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -114,6 +115,13 @@ export function Sidebar({
           );
         })}
       </nav>
+
+      {/* Sits with the account rather than with navigation: it changes how every
+          figure reads, so it belongs beside who you are, not beside where you
+          are going. */}
+      <div className="border-t border-ink-800 px-3 py-3.5">
+        <DisplayCurrencySwitcher />
+      </div>
 
       <div className="border-t border-ink-800 p-3">
         <div className="flex items-center gap-3 rounded-sheet px-2 py-2">

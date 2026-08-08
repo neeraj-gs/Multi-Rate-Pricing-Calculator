@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { ArrowLeft } from 'lucide-react';
@@ -8,6 +9,10 @@ import { connectToDatabase, User } from '@/lib/db';
 import { buildSummaryReport } from '@/lib/reports/summary';
 import { listDocuments } from '@/lib/documents/queries';
 import { reportRangeSchema } from '@/lib/validation/documents';
+import {
+  DISPLAY_CURRENCY_COOKIE,
+  normalizeDisplayCurrency,
+} from '@/lib/display-currency';
 import { formatDate, groupDigits, money } from '@/lib/utils';
 import { PrintButton } from '@/components/documents/PrintButton';
 
@@ -40,6 +45,13 @@ export default async function ReportPrintPage({
     status: params.status ?? 'all',
     groupBy: params.groupBy ?? 'month',
     ...(params.currency ? { currency: params.currency } : {}),
+    // Carried from the dashboard, so the PDF is the view you were looking at.
+    // Falls back to the cookie for a URL typed or bookmarked without it.
+    display: normalizeDisplayCurrency(
+      typeof params.display === 'string'
+        ? params.display
+        : (await cookies()).get(DISPLAY_CURRENCY_COOKIE)?.value,
+    ),
   });
 
   // A malformed range is the dashboard's problem to explain, not the PDF's.
@@ -61,6 +73,8 @@ export default async function ReportPrintPage({
   ]);
 
   const generated = new Date().toISOString();
+  const converted = report.display;
+  const headline = converted ?? report.byCurrency[0];
 
   return (
     <div className="min-h-dvh bg-ink-950">
@@ -114,31 +128,16 @@ export default async function ReportPrintPage({
             <Figure label="Documents" value={String(report.documentCount)} />
             <Figure
               label="Grand total"
-              value={
-                report.byCurrency[0]
-                  ? money(report.byCurrency[0].grandTotal, report.byCurrency[0].currency)
-                  : '—'
-              }
+              value={headline ? money(headline.grandTotal, headline.currency) : '—'}
               settled
             />
             <Figure
               label="Total tax"
-              value={
-                report.byCurrency[0]
-                  ? money(report.byCurrency[0].totalTax, report.byCurrency[0].currency)
-                  : '—'
-              }
+              value={headline ? money(headline.totalTax, headline.currency) : '—'}
             />
             <Figure
               label="Total discount"
-              value={
-                report.byCurrency[0]
-                  ? money(
-                      report.byCurrency[0].totalDiscount,
-                      report.byCurrency[0].currency,
-                    )
-                  : '—'
-              }
+              value={headline ? money(headline.totalDiscount, headline.currency) : '—'}
             />
           </section>
 
@@ -156,10 +155,15 @@ export default async function ReportPrintPage({
                   <th className="pb-2 pr-4 text-right font-medium">Discount</th>
                   <th className="pb-2 pr-4 text-right font-medium">Tax</th>
                   <th className="pb-2 pl-4 text-right font-medium">Grand total</th>
+                  {converted ? (
+                    <th className="pb-2 pl-4 text-right font-medium">
+                      In {converted.currency}
+                    </th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
-                {report.byCurrency.map((row) => (
+                {report.byCurrency.map((row, index) => (
                   <tr key={row.currency} className="border-b border-[#e5e7eb]">
                     <td className="py-2.5 pr-4 font-medium">{row.currency}</td>
                     <td className="tabular py-2.5 pr-4 text-right">
@@ -179,16 +183,46 @@ export default async function ReportPrintPage({
                     <td className="tabular py-2.5 pl-4 text-right font-semibold">
                       {groupDigits(row.grandTotal)}
                     </td>
+                    {converted ? (
+                      <td className="tabular py-2.5 pl-4 text-right">
+                        {groupDigits(converted.sources[index]?.grandTotal ?? '0.00')}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
+
+                {/* The combined figure only exists once there is a rate, so it
+                    is a row of the converted column and of nothing else. */}
+                {converted ? (
+                  <tr className="border-b-2 border-[#12161f]">
+                    <td className="py-2.5 pr-4 font-medium" colSpan={5}>
+                      Combined, converted to {converted.currency}
+                    </td>
+                    <td />
+                    <td className="tabular py-2.5 pl-4 text-right font-semibold">
+                      {groupDigits(converted.grandTotal)}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
 
-            <p className="mt-3 font-mono text-[0.625rem] leading-relaxed text-[#9ca3af]">
-              Currencies are reported separately and never summed — adding one to
-              another produces a figure that means nothing. Each row satisfies
-              subtotal − discount + tax = grand total exactly.
-            </p>
+            {converted && converted.converted ? (
+              <p className="mt-3 font-mono text-[0.625rem] leading-relaxed text-[#9ca3af]">
+                Each currency is reported in its own terms first; the final
+                column converts it at rates of {converted.ratesAsOf} —{' '}
+                {converted.sources.map((source) => source.rate).join(', ')}. Every
+                unconverted row satisfies subtotal − discount + tax = grand total
+                exactly. The combined figure depends on those rates and is for
+                comparison, not for accounting.
+              </p>
+            ) : (
+              <p className="mt-3 font-mono text-[0.625rem] leading-relaxed text-[#9ca3af]">
+                Currencies are reported separately and never summed — adding one to
+                another produces a figure that means nothing. Each row satisfies
+                subtotal − discount + tax = grand total exactly.
+              </p>
+            )}
           </section>
 
           {/* The documents behind the figures. */}

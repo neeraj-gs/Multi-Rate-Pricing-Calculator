@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from './CommandPalette';
+import { DisplayCurrencyProvider } from './DisplayCurrency';
 
 /**
  * The application chrome.
@@ -15,15 +16,19 @@ import { CommandPalette } from './CommandPalette';
  */
 export function AppShell({
   user,
+  displayCurrency,
   children,
 }: {
   user: { name: string; email: string };
+  /** Read from the cookie on the server, so the first paint is already right. */
+  displayCurrency: string;
   children: React.ReactNode;
 }) {
   const [paletteOpen, setPaletteOpen] = React.useState(false);
   const [navOpen, setNavOpen] = React.useState(false);
 
   return (
+    <DisplayCurrencyProvider initial={displayCurrency}>
     <div className="app-shell min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
       {/* Desktop navigation. `no-print` because the print route lives inside
           this shell, and a quote must never come out with a sidebar on it. */}
@@ -74,5 +79,6 @@ export function AppShell({
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
+    </DisplayCurrencyProvider>
   );
 }

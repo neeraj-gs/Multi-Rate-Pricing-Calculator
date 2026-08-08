@@ -1,7 +1,12 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/lib/auth/session';
 import { connectToDatabase, User } from '@/lib/db';
+import {
+  DISPLAY_CURRENCY_COOKIE,
+  normalizeDisplayCurrency,
+} from '@/lib/display-currency';
 import { AppShell } from '@/components/app/AppShell';
 
 /**
@@ -35,7 +40,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // is still validly signed and middleware would bounce it back here.
   if (!user) redirect('/api/auth/session-ended');
 
+  const displayCurrency = normalizeDisplayCurrency(
+    (await cookies()).get(DISPLAY_CURRENCY_COOKIE)?.value,
+  );
+
   return (
-    <AppShell user={{ name: user.name, email: user.email }}>{children}</AppShell>
+    <AppShell
+      user={{ name: user.name, email: user.email }}
+      displayCurrency={displayCurrency}
+    >
+      {children}
+    </AppShell>
   );
 }

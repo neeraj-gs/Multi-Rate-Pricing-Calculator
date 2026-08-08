@@ -1,7 +1,8 @@
 import { Types, type PipelineStage } from 'mongoose';
 
 import { DocumentModel } from '@/lib/db';
-import { formatMinor } from '@/lib/pricing';
+import { convertMinor, formatMinor, rateLabel, RATES_AS_OF } from '@/lib/pricing';
+import { isNative } from '@/lib/display-currency';
 import { toCalendarDate } from '@/lib/validation/common';
 import type { ReportRangeQuery } from '@/lib/validation/documents';
 
@@ -118,6 +119,79 @@ export interface SummaryReport {
   topCustomers: Array<{
     name: string;
     currency: string;
+    documentCount: number;
+    grandTotal: string;
+    grandTotalMinor: number;
+  }>;
+
+  /**
+   * The same report, expressed in one currency.
+   *
+   * Present only when a display currency was asked for. Every other field on
+   * this object stays exactly as it was — split by currency, never combined —
+   * so a caller that ignores this one is still correct, and the two views can
+   * be compared against each other.
+   *
+   * The point of the split: `byCurrency` answers "what did I quote in dirhams",
+   * which needs no rate and cannot be wrong. `display` answers "what did I
+   * quote in total", which cannot be answered without one. Keeping them apart
+   * means the second never quietly replaces the first.
+   */
+  display: DisplayView | null;
+}
+
+/** A currency-converted view of the report. Every figure is in `currency`. */
+export interface DisplayView {
+  currency: string;
+  /** The date the rates were taken, shown wherever a converted figure appears. */
+  ratesAsOf: string;
+  /** False when every document was already in this currency — nothing converted. */
+  converted: boolean;
+
+  subtotal: string;
+  totalDiscount: string;
+  totalTax: string;
+  grandTotal: string;
+  averageDocumentValue: string;
+  discountRatePercent: string;
+  effectiveTaxRatePercent: string;
+  amounts: {
+    subtotalMinor: number;
+    totalDiscountMinor: number;
+    totalTaxMinor: number;
+    grandTotalMinor: number;
+  };
+
+  /** What went into the combined figure, and at what rate. */
+  sources: Array<{
+    currency: string;
+    documentCount: number;
+    grandTotal: string;
+    grandTotalMinor: number;
+    rate: string;
+  }>;
+
+  byStatus: Array<{
+    status: 'draft' | 'finalized';
+    documentCount: number;
+    grandTotal: string;
+    grandTotalMinor: number;
+  }>;
+
+  comparison: { documentCount: number; grandTotalMinor: number } | null;
+
+  timeseries: Array<{
+    period: string;
+    label: string;
+    documentCount: number;
+    grandTotal: string;
+    totalTax: string;
+    totalDiscount: string;
+    grandTotalMinor: number;
+  }>;
+
+  topCustomers: Array<{
+    name: string;
     documentCount: number;
     grandTotal: string;
     grandTotalMinor: number;
@@ -282,7 +356,7 @@ export async function buildSummaryReport(
     };
   });
 
-  return {
+  const report: Omit<SummaryReport, 'display'> = {
     range: {
       from: toCalendarDate(query.from) ?? '',
       to: toCalendarDate(query.to) ?? '',
@@ -345,6 +419,169 @@ export async function buildSummaryReport(
       };
     }),
   };
+
+  return {
+    ...report,
+    // Only when asked for, and only ever *alongside* the per-currency figures.
+    display: isNative(query.display) ? null : buildDisplayView(report, query.display!),
+  };
+}
+
+/**
+ * Folds the per-currency report into one currency.
+ *
+ * Every figure is converted from the currency it was priced in, then summed —
+ * never the other way round. Summing first would mean adding AED to USD to get
+ * a meaningless intermediate and converting *that*, which is the exact mistake
+ * the rest of this module exists to prevent.
+ *
+ * Conversion happens on the integer minor units, once per figure, so the parts
+ * still add up to the whole after conversion: subtotal − discount + tax is
+ * carried through each currency's own conversion and summed, rather than being
+ * recomputed from three independently rounded totals.
+ */
+function buildDisplayView(
+  report: Omit<SummaryReport, 'display'>,
+  target: string,
+): DisplayView {
+  const to = target.toUpperCase();
+
+  const amounts = { subtotalMinor: 0, totalDiscountMinor: 0, totalTaxMinor: 0, grandTotalMinor: 0 };
+  for (const row of report.byCurrency) {
+    amounts.subtotalMinor += convertMinor(row.amounts.subtotalMinor, row.currency, to);
+    amounts.totalDiscountMinor += convertMinor(row.amounts.totalDiscountMinor, row.currency, to);
+    amounts.totalTaxMinor += convertMinor(row.amounts.totalTaxMinor, row.currency, to);
+    amounts.grandTotalMinor += convertMinor(row.amounts.grandTotalMinor, row.currency, to);
+  }
+
+  // Sums one period at a time across every currency present in it.
+  const periods = new Map<string, { label: string; count: number; grand: number; tax: number; discount: number }>();
+  for (const row of report.timeseries) {
+    const bucket = periods.get(row.period) ?? {
+      label: row.label,
+      count: 0,
+      grand: 0,
+      tax: 0,
+      discount: 0,
+    };
+    bucket.count += row.documentCount;
+    bucket.grand += convertMinor(row.grandTotalMinor, row.currency, to);
+    bucket.tax += convertMinor(minorFromFormatted(row.totalTax, row.currency), row.currency, to);
+    bucket.discount += convertMinor(
+      minorFromFormatted(row.totalDiscount, row.currency),
+      row.currency,
+      to,
+    );
+    periods.set(row.period, bucket);
+  }
+
+  // A customer billed in two currencies is one customer, which is only
+  // expressible once the amounts share a unit.
+  const customers = new Map<string, { count: number; grand: number }>();
+  for (const row of report.topCustomers) {
+    const bucket = customers.get(row.name) ?? { count: 0, grand: 0 };
+    bucket.count += row.documentCount;
+    bucket.grand += convertMinor(row.grandTotalMinor, row.currency, to);
+    customers.set(row.name, bucket);
+  }
+
+  const status = new Map<'draft' | 'finalized', { count: number; grand: number }>();
+  for (const row of report.byStatus) {
+    const bucket = status.get(row.status) ?? { count: 0, grand: 0 };
+    bucket.count += row.documentCount;
+    bucket.grand += convertMinor(row.grandTotalMinor, row.currency, to);
+    status.set(row.status, bucket);
+  }
+
+  const discountedBase = amounts.subtotalMinor - amounts.totalDiscountMinor;
+
+  return {
+    currency: to,
+    ratesAsOf: RATES_AS_OF,
+    converted: report.byCurrency.some((row) => row.currency !== to),
+
+    subtotal: formatMinor(amounts.subtotalMinor, to),
+    totalDiscount: formatMinor(amounts.totalDiscountMinor, to),
+    totalTax: formatMinor(amounts.totalTaxMinor, to),
+    grandTotal: formatMinor(amounts.grandTotalMinor, to),
+    averageDocumentValue: formatMinor(
+      report.documentCount === 0
+        ? 0
+        : Math.round(amounts.grandTotalMinor / report.documentCount),
+      to,
+    ),
+    discountRatePercent: ratio(amounts.totalDiscountMinor, amounts.subtotalMinor),
+    effectiveTaxRatePercent: ratio(amounts.totalTaxMinor, discountedBase),
+    amounts,
+
+    sources: report.byCurrency.map((row) => ({
+      currency: row.currency,
+      documentCount: row.documentCount,
+      grandTotal: formatMinor(
+        convertMinor(row.amounts.grandTotalMinor, row.currency, to),
+        to,
+      ),
+      grandTotalMinor: convertMinor(row.amounts.grandTotalMinor, row.currency, to),
+      rate: rateLabel(row.currency, to),
+    })),
+
+    byStatus: (['finalized', 'draft'] as const)
+      .filter((key) => status.has(key))
+      .map((key) => ({
+        status: key,
+        documentCount: status.get(key)!.count,
+        grandTotal: formatMinor(status.get(key)!.grand, to),
+        grandTotalMinor: status.get(key)!.grand,
+      })),
+
+    comparison: report.comparison
+      ? {
+          documentCount: report.comparison.documentCount,
+          grandTotalMinor: report.comparison.byCurrency.reduce(
+            (sum, row) => sum + convertMinor(row.grandTotalMinor, row.currency, to),
+            0,
+          ),
+        }
+      : null,
+
+    timeseries: [...periods.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([period, bucket]) => ({
+        period,
+        label: bucket.label,
+        documentCount: bucket.count,
+        grandTotal: formatMinor(bucket.grand, to),
+        totalTax: formatMinor(bucket.tax, to),
+        totalDiscount: formatMinor(bucket.discount, to),
+        grandTotalMinor: bucket.grand,
+      })),
+
+    topCustomers: [...customers.entries()]
+      .map(([name, bucket]) => ({
+        name,
+        documentCount: bucket.count,
+        grandTotal: formatMinor(bucket.grand, to),
+        grandTotalMinor: bucket.grand,
+      }))
+      .sort((a, b) => b.grandTotalMinor - a.grandTotalMinor),
+  };
+}
+
+/**
+ * Recovers minor units from a formatted amount.
+ *
+ * The timeseries rows carry tax and discount only as formatted strings — the
+ * shape predates anything needing to do arithmetic on them. Reading the digits
+ * back out is exact (the string came from `formatMinor`, which is lossless) and
+ * keeps the change here rather than widening a public shape every consumer
+ * already reads.
+ */
+function minorFromFormatted(value: string, currency: string): number {
+  const negative = value.startsWith('-');
+  const digits = value.replace(/[^0-9]/g, '');
+  const minor = Number(digits || '0');
+  void currency;
+  return negative ? -minor : minor;
 }
 
 /**
@@ -456,9 +693,21 @@ export async function buildReportCsv(
     .limit(10_000)
     .lean();
 
+  /*
+   * The document's own figures are never replaced by converted ones — this file
+   * is the audit trail, and a spreadsheet that shows dollars where the document
+   * says dirhams cannot be reconciled against anything.
+   *
+   * A display currency adds two columns instead: the converted grand total and
+   * the rate it used. The reader can then total the new column, check the rate,
+   * and still see every original amount beside it.
+   */
+  const display = isNative(query.display) ? null : query.display!;
+
   const header = [
     'Number', 'Title', 'Customer', 'Issue date', 'Status', 'Currency',
     'Line items', 'Subtotal', 'Total discount', 'Total tax', 'Grand total',
+    ...(display ? [`Grand total (${display})`, 'Rate used'] : []),
   ];
 
   const lines = rows.map((row) => {
@@ -475,6 +724,15 @@ export async function buildReportCsv(
       formatMinor(row.totals.totalDiscountMinor, currency),
       formatMinor(row.totals.totalTaxMinor, currency),
       formatMinor(row.totals.grandTotalMinor, currency),
+      ...(display
+        ? [
+            formatMinor(
+              convertMinor(row.totals.grandTotalMinor, currency, display),
+              display,
+            ),
+            rateLabel(currency, display),
+          ]
+        : []),
     ].map(escapeCsvCell).join(',');
   });
 
