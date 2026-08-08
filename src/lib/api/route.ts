@@ -68,9 +68,13 @@ export function defineRoute<
   PS extends ZodTypeAny | undefined = undefined,
 >(config: RouteConfig<BS, QS, PS>) {
   type Args = RouteHandlerArgs<BS, QS, PS>;
+  // The second parameter is typed exactly as Next 15 declares it — a required
+  // object whose `params` is a promise. Loosening it to optional makes the
+  // generated route type-check fail, which is the framework correctly refusing
+  // a handler it cannot call.
   return async function route(
     request: NextRequest,
-    segment?: { params?: Promise<Record<string, string>> },
+    segment: { params: Promise<Record<string, string>> },
   ): Promise<NextResponse> {
     const ctx = buildRequestContext(request);
     const method = request.method;
@@ -114,7 +118,9 @@ export function defineRoute<
       }
 
       // ---- Input validation ----------------------------------------------
+      // Static routes still receive a context object, but with no params in it.
       const rawParams = segment?.params ? await segment.params : {};
+
       const params = (
         config.params ? config.params.parse(rawParams) : rawParams
       ) as Args['params'];

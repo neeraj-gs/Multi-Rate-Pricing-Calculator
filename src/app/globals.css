@@ -1,0 +1,264 @@
+@import 'tailwindcss';
+
+/*
+ * ===========================================================================
+ * LedgerLine — "ink & brass"
+ * ===========================================================================
+ *
+ * The concept: the app is ink, the document you are making is paper.
+ *
+ * Chrome, navigation and controls sit on a deep indigo ink ground. Parchment
+ * is reserved exclusively for document surfaces — the editor sheet, the
+ * preview, the printable view. Nothing else is ever parchment, so the material
+ * itself tells you what you are looking at.
+ *
+ * Brass is the single accent, with verdigris as its oxidation partner for
+ * positive figures. They are a pair drawn from the same world — aged brass
+ * instruments — rather than two colours picked independently.
+ *
+ * Every monetary figure is set in IBM Plex Mono with tabular figures. No
+ * exceptions: columns of money must align on the decimal point, and a number
+ * that shifts as it updates reads as unstable.
+ */
+
+@theme {
+  /* --- Ink: the application ground -------------------------------------- */
+  --color-ink-950: #070a11;
+  --color-ink-900: #0b0f1a;
+  --color-ink-850: #0f1421;
+  --color-ink-800: #121826;
+  --color-ink-700: #1a2233;
+  --color-ink-600: #232d42;
+  --color-ink-500: #33405a;
+
+  /* --- Parchment: document surfaces only -------------------------------- */
+  --color-parchment-50: #faf8f3;
+  --color-parchment-100: #f3efe5;
+  --color-parchment-200: #ede8dd;
+  --color-parchment-300: #ddd5c4;
+  --color-parchment-400: #c3b89f;
+
+  /* --- Brass: the accent ------------------------------------------------ */
+  --color-brass-200: #f0dfae;
+  --color-brass-300: #e3ca86;
+  --color-brass-400: #d6b566;
+  --color-brass-500: #cda349;
+  --color-brass-600: #ab8535;
+  --color-brass-700: #7d5f24;
+
+  /* --- Verdigris: brass's patina. Positive figures, confirmations. ------ */
+  --color-verdigris-300: #7fc4b8;
+  --color-verdigris-400: #5aa89b;
+  --color-verdigris-500: #4a9a8f;
+  --color-verdigris-700: #2b5f58;
+
+  /* --- Oxblood: errors, destructive actions ----------------------------- */
+  --color-oxblood-300: #e08b7c;
+  --color-oxblood-400: #d06a58;
+  --color-oxblood-500: #c0503f;
+  --color-oxblood-700: #7a2f24;
+
+  /* --- Type on ink ------------------------------------------------------ */
+  --color-quill-100: #ece9e3;
+  --color-quill-300: #b6bbc7;
+  --color-quill-500: #868da0;
+  --color-quill-700: #5b6377;
+
+  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius-sheet: 3px;
+
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.65);
+  --shadow-sheet: 0 2px 4px rgb(0 0 0 / 0.35), 0 24px 64px -24px rgb(0 0 0 / 0.75);
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-ink-700);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ink-900);
+    color: var(--color-quill-100);
+    font-family: var(--font-sans);
+    font-feature-settings: 'kern' 1;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Every figure in the product aligns on its decimal point. Proportional
+   * digits make a column of money look ragged and make a live-updating total
+   * visibly jitter as it changes.
+   */
+  .tabular,
+  input[inputmode='decimal'],
+  input[type='number'] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'zero' 1;
+    letter-spacing: -0.01em;
+  }
+
+  /* A visible, high-contrast focus ring — never removed, only restyled. */
+  :focus-visible {
+    outline: 2px solid var(--color-brass-500);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-brass-500);
+    color: var(--color-ink-950);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-ink-600);
+    border-radius: 999px;
+    border: 2px solid var(--color-ink-900);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-500);
+  }
+}
+
+@layer components {
+  /*
+   * THE SIGNATURE.
+   *
+   * Accountants underline a settled total twice. The device recurs wherever a
+   * figure is final — the grand total, the headline figure on a report, the
+   * active navigation item — and nowhere else. It is the one piece of
+   * decoration in the product that carries meaning.
+   */
+  .double-rule {
+    position: relative;
+    padding-bottom: 6px;
+  }
+  .double-rule::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    border-top: 1px solid currentColor;
+    border-bottom: 1px solid currentColor;
+    opacity: 0.85;
+  }
+
+  /* Ruled paper, for document surfaces. */
+  .sheet {
+    background-color: var(--color-parchment-100);
+    color: var(--color-ink-900);
+    border-radius: var(--radius-sheet);
+    box-shadow: var(--shadow-sheet);
+  }
+
+  /* The faint grid that sits behind the ink chrome — engineering paper. */
+  .ink-grid {
+    background-image:
+      linear-gradient(to right, rgb(51 64 90 / 0.16) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(51 64 90 / 0.16) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-brass-500);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .animate-rise {
+    animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+  .animate-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgb(205 163 73 / 0.12),
+      transparent
+    );
+    animation: shimmer 1.8s infinite;
+  }
+}
+
+/*
+ * Motion is atmosphere here, never information — so removing all of it costs
+ * the user nothing but the atmosphere.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The printable document: parchment becomes actual paper. */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .sheet {
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+}
