@@ -10,8 +10,12 @@ figure in exact integer arithmetic; finalizing a document freezes it permanently
 > between them — the same claim the calculation engine makes about a document's
 > totals.
 
-**Live:** _<add deployed URL here>_
+**Live:** <https://multi-rate-pricing-calculator-ten.vercel.app>
 **Demo account:** `demo@ledgerline.app` / `demo-password-2026`
+**Health check:** <https://multi-rate-pricing-calculator-ten.vercel.app/api/health>
+
+Sign up with any email to start a fresh, empty account — accounts never see each
+other's documents.
 
 Built for the CrossVal take-home assignment.
 
