@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Archivo, Fraunces, IBM_Plex_Mono } from 'next/font/google';
+import { Archivo, IBM_Plex_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 
 import './globals.css';
@@ -10,22 +10,22 @@ import './globals.css';
  * reading a customer's quote.
  */
 
-/** Display. The `SOFT`/`WONK` axes give it the feel of an engraved certificate. */
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  variable: '--font-fraunces',
-  display: 'swap',
-  axes: ['SOFT', 'WONK', 'opsz'],
-});
-
-/** Interface. */
+/**
+ * One family for both display and interface, separated by the `wdth` axis
+ * rather than by adding a second typeface.
+ *
+ * Headlines run at width 112 and weight 700 — architectural, slightly
+ * expanded, tightly tracked — while body text stays at normal width. Same
+ * voice, different register, and one font file instead of two.
+ */
 const archivo = Archivo({
   subsets: ['latin'],
   variable: '--font-archivo',
   display: 'swap',
+  axes: ['wdth'],
 });
 
-/** Every monetary figure, every label. Ledger tape. */
+/** Every monetary figure, every label. */
 const plexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
@@ -35,15 +35,15 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'LedgerLine — pricing that ties out',
-    template: '%s · LedgerLine',
+    default: 'Tessera — pricing that ties out',
+    template: '%s · Tessera',
   },
   description:
     'Build quotes with per-line discounts and tax, computed server-side in exact integer arithmetic. Finalize a document and it never changes again.',
-  applicationName: 'LedgerLine',
+  applicationName: 'Tessera',
   authors: [{ name: 'Neeraj GS' }],
   openGraph: {
-    title: 'LedgerLine — pricing that ties out',
+    title: 'Tessera — pricing that ties out',
     description:
       'Per-line discounts and tax, computed server-side in exact integer arithmetic. Subtotal minus discount plus tax equals the grand total, every time.',
     type: 'website',
@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${archivo.variable} ${plexMono.variable}`}
+      className={`${archivo.variable} ${plexMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-dvh bg-ink-900 antialiased">

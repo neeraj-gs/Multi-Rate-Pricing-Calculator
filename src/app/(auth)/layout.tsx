@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { Sigma } from 'lucide-react';
 
 import { calculateDocument } from '@/lib/pricing';
 import { money } from '@/lib/utils';
+import { Mark } from '@/components/brand';
 
 /**
  * The sign-in shell.
@@ -23,11 +23,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         <div className="relative flex h-full flex-col justify-between p-12">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10">
-              <Sigma className="size-3.5 text-brass-400" />
+            <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10 p-1 text-brass-400">
+              <Mark />
             </span>
             <span className="font-display text-lg text-quill-100">
-              Ledger<span className="text-brass-400">Line</span>
+              Tessera
             </span>
           </Link>
 

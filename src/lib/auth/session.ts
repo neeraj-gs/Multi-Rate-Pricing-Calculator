@@ -27,10 +27,10 @@ import { cookies } from 'next/headers';
  * version and every outstanding token for that account stops verifying.
  */
 
-export const SESSION_COOKIE = 'll_session';
+export const SESSION_COOKIE = 'tsa_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
-const ISSUER = 'ledgerline';
-const AUDIENCE = 'ledgerline-app';
+const ISSUER = 'tessera';
+const AUDIENCE = 'tessera-app';
 
 export interface SessionPayload extends JWTPayload {
   sub: string;

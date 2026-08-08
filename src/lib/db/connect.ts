@@ -21,14 +21,14 @@ interface MongooseCache {
 
 declare global {
   // eslint-disable-next-line no-var
-  var __ledgerlineMongoose: MongooseCache | undefined;
+  var __tesseraMongoose: MongooseCache | undefined;
 }
 
-const cache: MongooseCache = globalThis.__ledgerlineMongoose ?? {
+const cache: MongooseCache = globalThis.__tesseraMongoose ?? {
   connection: null,
   promise: null,
 };
-globalThis.__ledgerlineMongoose = cache;
+globalThis.__tesseraMongoose = cache;
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
   if (cache.connection) return cache.connection;

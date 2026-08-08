@@ -157,7 +157,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <p className="mt-8 rounded-sheet border border-ink-700 bg-ink-850 px-4 py-3 text-center font-mono text-xs leading-relaxed text-quill-500">
           Demo account
           <br />
-          <span className="text-quill-300">demo@ledgerline.app</span> ·{' '}
+          <span className="text-quill-300">demo@tessera.app</span> ·{' '}
           <span className="text-quill-300">demo-password-2026</span>
         </p>
       ) : null}

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ArrowLeft, ExternalLink, Sigma } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
+
+import { Mark } from '@/components/brand';
 
 export const metadata: Metadata = { title: 'API reference' };
 
@@ -62,11 +64,11 @@ export default function ApiDocsPage() {
       <header className="border-b border-ink-800">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10">
-              <Sigma className="size-3.5 text-brass-400" />
+            <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10 p-1 text-brass-400">
+              <Mark />
             </span>
             <span className="font-display text-lg text-quill-100">
-              Ledger<span className="text-brass-400">Line</span>
+              Tessera
             </span>
           </Link>
           <Link
@@ -200,7 +202,7 @@ lineTotal        = discountedAmount + taxAmount`}</Pre>
           <Pre>{`# Sign in and keep the session cookie
 curl -c jar.txt -X POST http://localhost:3000/api/auth/login \\
   -H 'Content-Type: application/json' \\
-  -d '{"email":"demo@ledgerline.app","password":"demo-password-2026"}'
+  -d '{"email":"demo@tessera.app","password":"demo-password-2026"}'
 
 # Price the brief's sample document without storing anything
 curl -b jar.txt -X POST http://localhost:3000/api/pricing/preview \\

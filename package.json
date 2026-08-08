@@ -1,8 +1,8 @@
 {
-  "name": "ledgerline",
+  "name": "tessera",
   "version": "1.0.0",
   "private": true,
-  "description": "LedgerLine - multi-rate pricing calculator for quotes, proposals and billing documents.",
+  "description": "Tessera - multi-rate pricing calculator for quotes, proposals and billing documents.",
   "engines": {
     "node": ">=20.9.0"
   },

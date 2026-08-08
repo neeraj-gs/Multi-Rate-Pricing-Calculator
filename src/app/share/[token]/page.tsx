@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { Sigma } from 'lucide-react';
 
 import { connectToDatabase } from '@/lib/db';
 import { resolveShareToken } from '@/lib/documents/share';
 import { PrintableDocument } from '@/components/documents/PrintableDocument';
 import { PrintButton } from '@/components/documents/PrintButton';
+import { Mark } from '@/components/brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,11 +50,11 @@ export default async function SharedDocumentPage({
     <div className="min-h-dvh bg-ink-900 py-10">
       <div className="no-print mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-between gap-4 px-6">
         <span className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10">
-            <Sigma className="size-3.5 text-brass-400" />
-          </span>
+          <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10 p-1 text-brass-400">
+              <Mark />
+            </span>
           <span className="font-display text-lg text-quill-100">
-            Ledger<span className="text-brass-400">Line</span>
+            Tessera
           </span>
         </span>
 

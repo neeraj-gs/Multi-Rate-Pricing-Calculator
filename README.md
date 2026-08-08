@@ -1,11 +1,17 @@
-# LedgerLine
+# Tessera
 
 A multi-rate pricing calculator for quotes, proposals and billing documents.
 Line items carry their own discount and tax treatment; the server computes every
 figure in exact integer arithmetic; finalizing a document freezes it permanently.
 
+> A *tessera* is a single exactly-cut tile in a mosaic. That is the product's
+> thesis — many precise pieces composing one exact whole, with nothing lost
+> between them — and it is also the visual system: the landing page is built on
+> a provably gap-free octagon-and-square tessellation, extruded and lit as
+> metal.
+
 **Live:** _<add deployed URL here>_
-**Demo account:** `demo@ledgerline.app` / `demo-password-2026`
+**Demo account:** `demo@tessera.app` / `demo-password-2026`
 
 Built for the CrossVal take-home assignment.
 
@@ -336,6 +342,33 @@ feature from schema to screen, with MongoDB as the store.
 │  integers · BigInt · half-up│  │  auditlogs · idempotencykeys · share │
 └─────────────────────────────┘  └──────────────────────────────────────┘
 ```
+
+### Interface
+
+The app is dark tempered steel; the documents you make in it are paper.
+Parchment appears on document surfaces — the editor sheet, the preview, the
+printable view — and nowhere else, so the material itself tells you what you are
+looking at.
+
+Two hues do real work rather than one: bronze is the warm key, and steel-blue is
+the cool rim that makes the metal read as metal instead of a flat gold wash.
+Every monetary figure is set in IBM Plex Mono with tabular figures, without
+exception, so columns align on the decimal point and a live-updating total does
+not change width as it changes value. Display and interface share one typeface
+separated by its `wdth` axis rather than by adding a second family.
+
+The recurring device is the accountant's **double rule** under a settled total.
+It appears wherever a figure is final — the grand total, a report headline, the
+active nav item — and nowhere else, so it carries meaning rather than decorating.
+
+The hero is a real tessellation, not an abstract arrangement of cards: an
+octagon-and-square tiling where the octagon's apothem is exactly half the grid
+pitch, so the pattern closes with no gap at any size. Roughly 550 extruded tiles
+render as two `InstancedMesh` draw calls, lit by an environment built at runtime
+from `Lightformer` rectangles — so there is no HDR fetched from a CDN on the
+critical path. It respects `prefers-reduced-motion`, falls back to a CSS
+tessellation below `lg` and without WebGL, caps device pixel ratio, and pauses
+its frame loop off-screen.
 
 ### The two rules the whole design protects
 

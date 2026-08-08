@@ -62,7 +62,7 @@ export function AppShell({
             {navOpen ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
           <span className="font-display text-base text-quill-100">
-            Ledger<span className="text-brass-400">Line</span>
+            Tessera
           </span>
         </header>
 

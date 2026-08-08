@@ -27,7 +27,7 @@ async function main() {
   const server = await MongoMemoryServer.create({
     instance: {
       port: PORT,
-      dbName: 'ledgerline',
+      dbName: 'tessera',
       dbPath: DB_PATH,
       // Without this the data directory is wiped on shutdown, which would make
       // it a scratch database rather than a local one.
@@ -36,7 +36,7 @@ async function main() {
     binary: { version: '7.0.14' },
   });
 
-  const uri = `mongodb://127.0.0.1:${PORT}/ledgerline`;
+  const uri = `mongodb://127.0.0.1:${PORT}/tessera`;
 
   console.log('');
   console.log('  MongoDB is running locally.');

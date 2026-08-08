@@ -11,8 +11,8 @@ import dynamic from 'next/dynamic';
  * three.js out of the initial bundle, so the headline paints without waiting
  * for a renderer.
  */
-const LedgerScene = dynamic(() => import('./LedgerScene'), { ssr: false });
+const TesseraScreen = dynamic(() => import('./TesseraScreen'), { ssr: false });
 
 export function SceneMount() {
-  return <LedgerScene />;
+  return <TesseraScreen />;
 }

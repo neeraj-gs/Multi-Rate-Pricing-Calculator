@@ -2,76 +2,93 @@
 
 /*
  * ===========================================================================
- * LedgerLine — "ink & brass"
+ * Tessera
  * ===========================================================================
  *
- * The concept: the app is ink, the document you are making is paper.
+ * A tessera is a single exactly-cut tile in a mosaic. That is the product's
+ * thesis — many precise pieces composing one exact whole — and it is also the
+ * visual system: a geometric tessellation, the vernacular of Gulf architectural
+ * screens, where every piece meets its neighbours with no gap.
  *
- * Chrome, navigation and controls sit on a deep indigo ink ground. Parchment
- * is reserved exclusively for document surfaces — the editor sheet, the
- * preview, the printable view. Nothing else is ever parchment, so the material
- * itself tells you what you are looking at.
+ * The material story: the app is dark tempered steel, and the documents you
+ * make in it are paper. Parchment appears on document surfaces and nowhere
+ * else, so the material itself tells you what you are looking at.
  *
- * Brass is the single accent, with verdigris as its oxidation partner for
- * positive figures. They are a pair drawn from the same world — aged brass
- * instruments — rather than two colours picked independently.
+ * Two hues do real work, not one. Bronze is the warm key — the metal of the
+ * screen. Steel-blue is the cool rim that makes that metal read as metal
+ * rather than as a flat gold wash. A single-accent dark palette is the look
+ * every generated page arrives at; a warm/cool pair is what a lighting artist
+ * would actually reach for.
  *
- * Every monetary figure is set in IBM Plex Mono with tabular figures. No
- * exceptions: columns of money must align on the decimal point, and a number
- * that shifts as it updates reads as unstable.
+ * Every monetary figure is IBM Plex Mono with tabular figures, no exceptions:
+ * columns of money must align on the decimal point, and a total that changes
+ * width as it updates reads as unstable.
  */
 
 @theme {
-  /* --- Ink: the application ground -------------------------------------- */
-  --color-ink-950: #070a11;
-  --color-ink-900: #0b0f1a;
-  --color-ink-850: #0f1421;
-  --color-ink-800: #121826;
-  --color-ink-700: #1a2233;
-  --color-ink-600: #232d42;
-  --color-ink-500: #33405a;
+  /* --- Ink: the application ground. Blue-black, not neutral black. ------- */
+  --color-ink-950: #04060b;
+  --color-ink-900: #070b13;
+  --color-ink-850: #0b111c;
+  --color-ink-800: #111826;
+  --color-ink-700: #1a2333;
+  --color-ink-600: #263145;
+  --color-ink-500: #38455e;
 
-  /* --- Parchment: document surfaces only -------------------------------- */
-  --color-parchment-50: #faf8f3;
-  --color-parchment-100: #f3efe5;
-  --color-parchment-200: #ede8dd;
-  --color-parchment-300: #ddd5c4;
-  --color-parchment-400: #c3b89f;
+  /* --- Parchment: document surfaces only --------------------------------- */
+  --color-parchment-50: #fbf9f4;
+  --color-parchment-100: #f4f1e8;
+  --color-parchment-200: #ebe6d9;
+  --color-parchment-300: #d7cfbb;
+  --color-parchment-400: #b6ab90;
 
-  /* --- Brass: the accent ------------------------------------------------ */
-  --color-brass-200: #f0dfae;
-  --color-brass-300: #e3ca86;
-  --color-brass-400: #d6b566;
-  --color-brass-500: #cda349;
-  --color-brass-600: #ab8535;
-  --color-brass-700: #7d5f24;
+  /* --- Bronze: the warm key, and the accent ------------------------------ */
+  --color-brass-200: #f7dfae;
+  --color-brass-300: #f0c87f;
+  --color-brass-400: #e6b358;
+  --color-brass-500: #d99b32;
+  --color-brass-600: #b07724;
+  --color-brass-700: #7a5218;
 
-  /* --- Verdigris: brass's patina. Positive figures, confirmations. ------ */
-  --color-verdigris-300: #7fc4b8;
-  --color-verdigris-400: #5aa89b;
-  --color-verdigris-500: #4a9a8f;
-  --color-verdigris-700: #2b5f58;
+  /* --- Steel: the cool rim. Secondary, and used. ------------------------- */
+  --color-steel-200: #cfe2f2;
+  --color-steel-300: #a6c6e2;
+  --color-steel-400: #7ba7ce;
+  --color-steel-500: #5885ad;
+  --color-steel-700: #2c4763;
 
-  /* --- Oxblood: errors, destructive actions ----------------------------- */
-  --color-oxblood-300: #e08b7c;
-  --color-oxblood-400: #d06a58;
-  --color-oxblood-500: #c0503f;
-  --color-oxblood-700: #7a2f24;
+  /* --- Verdigris: positive figures, confirmations ------------------------ */
+  --color-verdigris-300: #7fd6c0;
+  --color-verdigris-400: #4fbf9f;
+  --color-verdigris-500: #3aa588;
+  --color-verdigris-700: #1f5b4c;
 
-  /* --- Type on ink ------------------------------------------------------ */
-  --color-quill-100: #ece9e3;
-  --color-quill-300: #b6bbc7;
-  --color-quill-500: #868da0;
-  --color-quill-700: #5b6377;
+  /* --- Rust: errors, destructive actions --------------------------------- */
+  --color-oxblood-300: #eb9683;
+  --color-oxblood-400: #de7159;
+  --color-oxblood-500: #c9553c;
+  --color-oxblood-700: #7d3020;
 
-  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
+  /* --- Type on ink ------------------------------------------------------- */
+  --color-quill-100: #edeff3;
+  --color-quill-300: #b3bccb;
+  --color-quill-500: #7f8b9f;
+  --color-quill-700: #545f73;
+
+  /*
+   * One family across display and interface, separated by width rather than
+   * by adding a second typeface. Archivo's `wdth` axis gives the headlines an
+   * architectural, slightly-expanded set that reads as drawn rather than
+   * typed, while the body stays at normal width and full legibility.
+   */
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 
   --radius-sheet: 3px;
 
-  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.65);
-  --shadow-sheet: 0 2px 4px rgb(0 0 0 / 0.35), 0 24px 64px -24px rgb(0 0 0 / 0.75);
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -12px rgb(0 0 0 / 0.7);
+  --shadow-sheet: 0 2px 4px rgb(0 0 0 / 0.4), 0 28px 70px -26px rgb(0 0 0 / 0.8);
 }
 
 @layer base {
@@ -90,9 +107,20 @@
     background-color: var(--color-ink-900);
     color: var(--color-quill-100);
     font-family: var(--font-sans);
-    font-feature-settings: 'kern' 1;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Display type: expanded width, heavy, tightly tracked. The extra width is
+   * what makes a headline in the same family as the body still read as a
+   * different voice.
+   */
+  .font-display {
+    font-variation-settings: 'wdth' 112;
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1.02;
   }
 
   /*
@@ -111,7 +139,7 @@
 
   /* A visible, high-contrast focus ring — never removed, only restyled. */
   :focus-visible {
-    outline: 2px solid var(--color-brass-500);
+    outline: 2px solid var(--color-brass-400);
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -171,20 +199,39 @@
     box-shadow: var(--shadow-sheet);
   }
 
-  /* The faint grid that sits behind the ink chrome — engineering paper. */
-  .ink-grid {
+  /*
+   * The tessellation, flattened into CSS.
+   *
+   * The same octagon-and-square tiling the 3D hero extrudes, drawn here as a
+   * faint background for sections the canvas does not cover — so the pattern
+   * is the product's texture throughout, not an effect confined to the hero.
+   */
+  .tessellate {
     background-image:
-      linear-gradient(to right, rgb(51 64 90 / 0.16) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(51 64 90 / 0.16) 1px, transparent 1px);
-    background-size: 48px 48px;
+      linear-gradient(45deg, rgb(56 69 94 / 0.16) 25%, transparent 25%, transparent 75%, rgb(56 69 94 / 0.16) 75%),
+      linear-gradient(-45deg, rgb(56 69 94 / 0.16) 25%, transparent 25%, transparent 75%, rgb(56 69 94 / 0.16) 75%);
+    background-size: 34px 34px;
+    background-position: 0 0, 17px 17px;
   }
 
   .eyebrow {
     font-family: var(--font-mono);
     font-size: 0.6875rem;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    color: var(--color-brass-500);
+    color: var(--color-brass-400);
+  }
+
+  /* A hairline that fades out at both ends — a rule, not a border. */
+  .fade-rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--color-ink-600) 15%,
+      var(--color-ink-600) 85%,
+      transparent
+    );
   }
 }
 
@@ -199,7 +246,7 @@
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translateY(14px);
+      transform: translateY(16px);
     }
     to {
       opacity: 1;
@@ -207,7 +254,7 @@
     }
   }
   .animate-rise {
-    animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   @keyframes shimmer {
@@ -223,7 +270,7 @@
     background-image: linear-gradient(
       90deg,
       transparent,
-      rgb(205 163 73 / 0.12),
+      rgb(217 155 50 / 0.12),
       transparent
     );
     animation: shimmer 1.8s infinite;

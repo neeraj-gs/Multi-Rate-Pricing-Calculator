@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 const spec = {
   openapi: '3.1.0',
   info: {
-    title: 'LedgerLine API',
+    title: 'Tessera API',
     version: '1.0.0',
     description: [
       'Multi-rate pricing calculator for quotes, proposals and billing documents.',
@@ -60,7 +60,7 @@ const spec = {
       sessionCookie: {
         type: 'apiKey',
         in: 'cookie',
-        name: 'll_session',
+        name: 'tsa_session',
         description: 'httpOnly JWT session cookie, set by /auth/login and /auth/signup.',
       },
     },

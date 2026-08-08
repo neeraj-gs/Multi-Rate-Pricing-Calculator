@@ -12,12 +12,12 @@ import {
   Plus,
   Search,
   Settings,
-  Sigma,
 } from 'lucide-react';
 
 import { api } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Mark } from '@/components/brand';
 
 const NAV = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -49,11 +49,11 @@ export function Sidebar({
     <div className="flex h-full flex-col border-r border-ink-800 bg-ink-950/60">
       <div className="flex h-16 items-center px-5">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10">
-            <Sigma className="size-3.5 text-brass-400" />
-          </span>
+          <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10 p-1 text-brass-400">
+              <Mark />
+            </span>
           <span className="font-display text-lg text-quill-100">
-            Ledger<span className="text-brass-400">Line</span>
+            Tessera
           </span>
         </Link>
       </div>
