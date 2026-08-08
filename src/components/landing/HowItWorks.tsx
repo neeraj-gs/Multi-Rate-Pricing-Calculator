@@ -193,7 +193,7 @@ function CreateVisual() {
         </span>
       }
     >
-      <div className="sheet space-y-4 p-5">
+      <div className="space-y-4">
         <MockField label="Title" value="Q3 platform renewal" />
         <div className="grid gap-4 sm:grid-cols-2">
           <MockField label="Customer" value="Acme Trading LLC" />
@@ -201,7 +201,7 @@ function CreateVisual() {
         </div>
         <div className="grid items-end gap-4 sm:grid-cols-2">
           <MockField label="Currency" value="AED" mono hint="fixed at creation" />
-          <span className="rounded-[2px] bg-brass-500 px-3 py-2 text-center text-[0.8125rem] font-semibold text-ink-950">
+          <span className="rounded-sheet bg-brass-500 px-3 py-2 text-center text-[0.8125rem] font-semibold text-ink-950">
             Create document
           </span>
         </div>
@@ -224,15 +224,15 @@ function MockField({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-ink-500">
+        <p className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-quill-700">
           {label}
         </p>
         {hint ? (
-          <p className="font-mono text-[0.5625rem] text-parchment-400">{hint}</p>
+          <p className="font-mono text-[0.5625rem] text-quill-700">{hint}</p>
         ) : null}
       </div>
       <p
-        className={`mt-1.5 rounded-[2px] border border-parchment-300 bg-parchment-50 px-2.5 py-2 text-[0.8125rem] text-ink-900 ${
+        className={`mt-1.5 rounded-sheet border border-ink-600 bg-ink-900 px-2.5 py-2 text-[0.8125rem] text-quill-100 ${
           mono ? 'tabular' : ''
         }`}
       >
@@ -259,8 +259,8 @@ function LinesVisual() {
       */}
       <div className="bg-ink-950">
         <div className="p-4 pb-0">
-          <div className="sheet overflow-hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_3rem_2.25rem_1.75rem_3.25rem] gap-2 border-b border-parchment-300 px-3 py-2 font-mono text-[0.5rem] uppercase tracking-[0.1em] text-ink-500">
+          <div className="overflow-hidden rounded-sheet border border-ink-700 bg-ink-900">
+            <div className="grid grid-cols-[minmax(0,1fr)_1.75rem_3rem_2.25rem_1.75rem_3.25rem] gap-2 border-b border-ink-800 px-3 py-2 font-mono text-[0.5rem] uppercase tracking-[0.1em] text-quill-700">
               <span>Description</span>
               <span className="text-right">Qty</span>
               <span className="text-right">Unit</span>
@@ -271,13 +271,13 @@ function LinesVisual() {
             {rows.map(([name, qty, unit, disc, tax, total]) => (
               <div
                 key={name}
-                className="grid grid-cols-[minmax(0,1fr)_1.75rem_3rem_2.25rem_1.75rem_3.25rem] gap-2 border-b border-parchment-300/60 px-3 py-2 text-[0.75rem] text-ink-800 last:border-0"
+                className="grid grid-cols-[minmax(0,1fr)_1.75rem_3rem_2.25rem_1.75rem_3.25rem] gap-2 border-b border-ink-800/70 px-3 py-2 text-[0.75rem] text-quill-100 last:border-0"
               >
                 <span className="truncate">{name}</span>
-                <span className="tabular text-right">{qty}</span>
-                <span className="tabular text-right">{unit}</span>
-                <span className="tabular text-right text-ink-500">{disc}</span>
-                <span className="tabular text-right text-ink-500">{tax}</span>
+                <span className="tabular text-right text-quill-300">{qty}</span>
+                <span className="tabular text-right text-quill-300">{unit}</span>
+                <span className="tabular text-right text-verdigris-400">{disc}</span>
+                <span className="tabular text-right text-steel-400">{tax}</span>
                 <span className="tabular text-right font-medium">{total}</span>
               </div>
             ))}

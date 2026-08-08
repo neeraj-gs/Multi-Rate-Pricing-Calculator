@@ -62,6 +62,7 @@ export default async function DocumentPage({
       // Newly added lines start at the account's default tax rate, so the
       // common case is typing a description and a price and nothing else.
       defaultTaxPercent={formatPercent(user?.preferences?.defaultTaxPercent ?? 0)}
+      issuer={{ name: user?.name ?? '', company: user?.company ?? '' }}
     />
   );
 }

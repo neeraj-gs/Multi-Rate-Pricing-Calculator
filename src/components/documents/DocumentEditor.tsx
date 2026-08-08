@@ -9,15 +9,16 @@ import {
   Copy,
   FileLock2,
   Link2,
-  Printer,
+  PanelRightClose,
+  PanelRightOpen,
   Save,
   Trash2,
 } from 'lucide-react';
 
 import { api, ApiClientError, newIdempotencyKey } from '@/lib/api-client';
-import { formatDateTime, todayISO } from '@/lib/utils';
+import { cn, currencySymbol, formatDateTime, todayISO } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Textarea } from '@/components/ui/field';
+import { Textarea } from '@/components/ui/field';
 import {
   Dialog,
   DialogClose,
@@ -27,27 +28,33 @@ import {
 } from '@/components/ui/primitives';
 import type { ApiDocument, DraftLine } from '@/lib/documents/types';
 
-import { LineItemsTable } from './LineItemsTable';
-import { TotalsPanel } from './TotalsPanel';
+import { LineItemEditor } from './LineItemEditor';
+import { DocumentViewer } from './DocumentViewer';
+import type { DocumentPageProps } from './DocumentPage';
 import { usePricingPreview, toLineInput } from './usePricingPreview';
 
 /**
- * The document editor.
+ * The document workspace.
+ *
+ * Controls on the left, the document itself on the right, updating as you
+ * type. The point of the split is that you are never editing an abstraction of
+ * a quote — you are watching the thing you are about to send take shape, and
+ * the preview is the *same component* the PDF and the share link render, so
+ * there is nothing to be surprised by later.
  *
  * ## Where the numbers come from
  *
  * Nowhere in this component is a monetary value computed. Editing a field
  * updates local text, a debounced request asks the server what that text is
- * worth, and the answer is rendered. Saving sends the same inputs to the write
- * path, which runs the same engine — so what you saw while typing and what got
- * stored cannot disagree.
+ * worth, and the answer is rendered onto the page. The client never does
+ * arithmetic; it just asks faster.
  *
  * ## Where immutability is enforced
  *
- * In the API, not here. This component hides the controls on a finalized
- * document because showing a disabled Save button is a worse experience than
- * not showing one — but if it rendered them anyway, every request would come
- * back 409. The UI reflects the rule; it does not implement it.
+ * In the API, not here. A finalized document hides its editing controls
+ * because a permanent record dressed as a form invites an edit the server is
+ * only going to refuse — but if this rendered them anyway, every request would
+ * still come back 409.
  */
 
 function toDraftLines(document: ApiDocument): DraftLine[] {
@@ -78,10 +85,12 @@ function blankLine(defaultTaxPercent: string): DraftLine {
 export function DocumentEditor({
   initial,
   defaultTaxPercent = '0',
+  issuer,
 }: {
   initial: ApiDocument;
   /** From the account's preferences; applied to newly added lines. */
   defaultTaxPercent?: string;
+  issuer?: { name: string; company: string };
 }) {
   const router = useRouter();
 
@@ -99,18 +108,19 @@ export function DocumentEditor({
   const [busy, setBusy] = React.useState<string | null>(null);
   const [saveError, setSaveError] = React.useState<ApiClientError | null>(null);
   const [savedAt, setSavedAt] = React.useState<string | null>(initial.updatedAt);
+  const [previewOpen, setPreviewOpen] = React.useState(true);
 
   const readOnly = !document.editable;
   const currency = document.currency;
+  const symbol = currencySymbol(currency);
 
   const { preview, pending, error, latencyMs, fieldErrors } = usePricingPreview(
     lines,
     currency,
   );
 
-  // Combine the two sources of field-level errors so an input shows whichever
-  // arrived most recently, rather than the preview's stale one after a failed
-  // save (or vice versa).
+  // Merge the two sources of field-level errors so an input shows whichever
+  // arrived most recently, rather than a stale one from the other source.
   const combinedFieldErrors = React.useMemo(() => {
     const merged: Record<string, string> = { ...fieldErrors };
     for (const detail of saveError?.details ?? []) {
@@ -141,20 +151,59 @@ export function DocumentEditor({
         notes: document.notes,
         lines: toDraftLines(document).map(toLineInput),
       }),
-    [
-      title,
-      customerName,
-      customerEmail,
-      customerAddress,
-      issueDate,
-      dueDate,
-      notes,
-      lines,
-      document,
-    ],
+    [title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, lines, document],
   );
 
-  /* --- Line editing ----------------------------------------------------- */
+  /* --- The live page ----------------------------------------------------- */
+
+  const page: DocumentPageProps = React.useMemo(
+    () => ({
+      number: document.number,
+      status: document.status,
+      title,
+      customer: {
+        name: customerName,
+        email: customerEmail,
+        address: customerAddress,
+      },
+      issueDate,
+      dueDate: dueDate || null,
+      currency,
+      notes,
+      finalizedAt: document.finalizedAt,
+      issuer,
+      lines: lines.map((line, index) => {
+        const computed = preview?.lines?.[index];
+        return {
+          id: line.key,
+          description: line.description,
+          quantity: line.quantity || '—',
+          unitPrice: line.unitPrice || '0.00',
+          discountLabel:
+            line.discountType === 'none' || line.discountValue.trim() === ''
+              ? null
+              : line.discountType === 'percent'
+                ? `${line.discountValue}%`
+                : `${symbol}${line.discountValue}`,
+          discountAmount: computed?.discountAmount ?? '0.00',
+          taxPercent: line.taxPercent.trim() === '' ? null : line.taxPercent,
+          taxAmount: computed?.taxAmount ?? '0.00',
+          total: computed?.total ?? '—',
+        };
+      }),
+      totals: preview?.totals
+        ? {
+            subtotal: preview.totals.subtotal,
+            totalDiscount: preview.totals.totalDiscount,
+            totalTax: preview.totals.totalTax,
+            grandTotal: preview.totals.grandTotal,
+          }
+        : null,
+    }),
+    [document, title, customerName, customerEmail, customerAddress, issueDate, dueDate, currency, notes, issuer, lines, preview, symbol],
+  );
+
+  /* --- Line editing ------------------------------------------------------ */
 
   const updateLine = React.useCallback((key: string, patch: Partial<DraftLine>) => {
     setLines((current) =>
@@ -179,9 +228,9 @@ export function DocumentEditor({
     });
   }, []);
 
-  /* --- Persistence ------------------------------------------------------ */
+  /* --- Persistence -------------------------------------------------------- */
 
-  async function save() {
+  const save = React.useCallback(async (): Promise<boolean> => {
     setSaving(true);
     setSaveError(null);
     try {
@@ -207,6 +256,7 @@ export function DocumentEditor({
       setLines(toDraftLines(updated));
       setSavedAt(updated.updatedAt);
       toast.success('Changes saved');
+      return true;
     } catch (thrown) {
       const apiError =
         thrown instanceof ApiClientError
@@ -218,9 +268,28 @@ export function DocumentEditor({
           ? 'This document changed in another tab. Refresh to see the latest version.'
           : apiError.message,
       );
+      return false;
     } finally {
       setSaving(false);
     }
+  }, [document, title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, lines]);
+
+  /**
+   * The PDF always reflects what is *stored*, so an unsaved edit is saved
+   * first. Opening a PDF that silently omits the change you just made is the
+   * kind of thing you only discover after sending it.
+   */
+  async function openPdf() {
+    setBusy('pdf');
+    if (dirty && !readOnly) {
+      const ok = await save();
+      if (!ok) {
+        setBusy(null);
+        return;
+      }
+    }
+    setBusy(null);
+    router.push(`/documents/${document.id}/print`);
   }
 
   async function finalize() {
@@ -239,7 +308,7 @@ export function DocumentEditor({
       // A finalize refusal usually lists several reasons; showing only the
       // first would send the user round the loop once per problem.
       toast.error(apiError.message, {
-        description: apiError.details?.map((d) => d.message).join(' '),
+        description: apiError.details?.map((detail) => detail.message).join(' '),
       });
     } finally {
       setBusy(null);
@@ -292,7 +361,7 @@ export function DocumentEditor({
     }
   }
 
-  /* --- Keyboard --------------------------------------------------------- */
+  /* --- Keyboard ----------------------------------------------------------- */
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -303,53 +372,61 @@ export function DocumentEditor({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly, dirty, title, customerName, lines]);
+  }, [readOnly, dirty, save]);
 
-  /* --- Render ----------------------------------------------------------- */
+  /* --- Render -------------------------------------------------------------- */
 
   return (
-    <div className="pb-24">
-      <header className="sticky top-0 z-20 border-b border-ink-800 bg-ink-900/90 backdrop-blur-xl">
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4 lg:px-10">
+    // Below lg the shell adds a 3.5rem mobile header, so a plain `h-dvh` here
+    // overflows the viewport by exactly that much.
+    <div className="flex min-h-[calc(100dvh-3.5rem)] flex-col lg:h-dvh lg:min-h-0">
+      {/* Command bar */}
+      <header className="shrink-0 border-b border-ink-800 bg-ink-900">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 lg:px-6">
           <Button asChild variant="ghost" size="icon" aria-label="Back to documents">
             <Link href="/documents">
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2.5">
-              <span className="whitespace-nowrap font-mono text-xs text-brass-500">
-                {document.number}
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="whitespace-nowrap font-mono text-xs text-brass-400">
+              {document.number}
+            </span>
+            <StatusBadge status={document.status} />
+            {readOnly ? null : dirty ? (
+              <span className="whitespace-nowrap font-mono text-[0.625rem] text-brass-300">
+                Unsaved
               </span>
-              <StatusBadge status={document.status} />
-              {readOnly ? null : dirty ? (
-                <span className="font-mono text-[0.6875rem] text-quill-700">
-                  Unsaved changes
-                </span>
-              ) : savedAt ? (
-                <span className="font-mono text-[0.6875rem] text-quill-700">
-                  Saved {formatDateTime(savedAt)}
-                </span>
-              ) : null}
-            </div>
+            ) : savedAt ? (
+              <span className="hidden whitespace-nowrap font-mono text-[0.625rem] text-quill-700 sm:inline">
+                Saved {formatDateTime(savedAt)}
+              </span>
+            ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => window.print()}>
-              <Printer className="size-4" />
-              <span className="hidden sm:inline">Print</span>
-            </Button>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={share}
-              loading={busy === 'share'}
+              onClick={() => setPreviewOpen((open) => !open)}
+              className="hidden xl:inline-flex"
             >
+              {previewOpen ? (
+                <PanelRightClose className="size-4" />
+              ) : (
+                <PanelRightOpen className="size-4" />
+              )}
+              <span className="hidden 2xl:inline">
+                {previewOpen ? 'Hide' : 'Show'} document
+              </span>
+            </Button>
+
+            <Button variant="ghost" size="sm" onClick={share} loading={busy === 'share'}>
               <Link2 className="size-4" />
               <span className="hidden sm:inline">Share</span>
             </Button>
+
             <Button
               variant="secondary"
               size="sm"
@@ -387,14 +464,13 @@ export function DocumentEditor({
                     <div className="space-y-4 px-5 py-5 text-sm text-quill-300">
                       <p>
                         Once finalized, {document.number} becomes read-only. Its
-                        lines, amounts and details can never be changed again,
-                        and it cannot be deleted — reports covering this period
-                        depend on it staying exactly as it is.
+                        lines, amounts and details can never be changed again, and
+                        it cannot be deleted — reports covering this period depend
+                        on it staying exactly as it is.
                       </p>
                       <p className="text-quill-500">
-                        If you need to change something later, duplicate it into
-                        a new draft. The original stays as your customer
-                        received it.
+                        If you need to change something later, duplicate it into a
+                        new draft. The original stays as your customer received it.
                       </p>
                       {dirty ? (
                         <p className="rounded-sheet border border-brass-700 bg-brass-500/10 px-3.5 py-2.5 text-brass-300">
@@ -433,8 +509,8 @@ export function DocumentEditor({
                     description="This cannot be undone."
                   >
                     <p className="px-5 py-5 text-sm text-quill-300">
-                      {document.number} and its {document.lines.length} line
-                      items will be removed permanently.
+                      {document.number} and its {document.lines.length} line items
+                      will be removed permanently.
                     </p>
                     <div className="flex justify-end gap-2 border-t border-ink-700 px-5 py-4">
                       <DialogClose asChild>
@@ -459,94 +535,43 @@ export function DocumentEditor({
         </div>
 
         {readOnly ? (
-          <div className="flex items-center gap-2.5 border-t border-verdigris-700/50 bg-verdigris-500/[0.07] px-6 py-2.5 lg:px-10">
+          <div className="flex items-center gap-2.5 border-t border-verdigris-700/50 bg-verdigris-500/[0.07] px-4 py-2 lg:px-6">
             <FileLock2 className="size-3.5 shrink-0 text-verdigris-400" />
             <p className="text-xs text-verdigris-300">
-              Finalized {formatDateTime(document.finalizedAt)}. This document is
-              read-only — duplicate it to make changes.
+              Finalized {formatDateTime(document.finalizedAt)}. Read-only — duplicate
+              it to make changes.
             </p>
           </div>
         ) : null}
       </header>
 
-      <div className="grid gap-6 px-6 py-8 lg:grid-cols-[1fr_20rem] lg:px-10">
-        <div className="min-w-0 space-y-6">
-          {/* The document header, on parchment. */}
-          <div className="sheet p-6">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <SheetField label="Title" htmlFor="doc-title" className="sm:col-span-2">
-                <input
-                  id="doc-title"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  readOnly={readOnly}
-                  placeholder="Q3 proposal"
-                  className="w-full border-b border-parchment-300 bg-transparent pb-1.5 font-display text-2xl text-ink-900 outline-none placeholder:text-parchment-400 focus:border-ink-600 read-only:border-transparent"
-                />
-              </SheetField>
+      {/* Workspace */}
+      <div
+        className={cn(
+          'grid min-h-0 flex-1',
+          previewOpen ? 'xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]' : 'xl:grid-cols-1',
+        )}
+      >
+        {/* Controls */}
+        <div className="min-h-0 space-y-4 overflow-y-auto border-ink-800 p-4 xl:border-r xl:p-5">
+          <Details
+            title={title}
+            setTitle={setTitle}
+            customerName={customerName}
+            setCustomerName={setCustomerName}
+            customerEmail={customerEmail}
+            setCustomerEmail={setCustomerEmail}
+            customerAddress={customerAddress}
+            setCustomerAddress={setCustomerAddress}
+            issueDate={issueDate}
+            setIssueDate={setIssueDate}
+            dueDate={dueDate}
+            setDueDate={setDueDate}
+            readOnly={readOnly}
+            errors={combinedFieldErrors}
+          />
 
-              <SheetField label="Customer" htmlFor="doc-customer">
-                <SheetInput
-                  id="doc-customer"
-                  value={customerName}
-                  onChange={setCustomerName}
-                  readOnly={readOnly}
-                  placeholder="Acme Trading LLC"
-                  error={combinedFieldErrors['customer.name']}
-                />
-              </SheetField>
-
-              <SheetField label="Customer email" htmlFor="doc-email">
-                <SheetInput
-                  id="doc-email"
-                  value={customerEmail}
-                  onChange={setCustomerEmail}
-                  readOnly={readOnly}
-                  type="email"
-                  placeholder="accounts@acme.com"
-                  error={combinedFieldErrors['customer.email']}
-                />
-              </SheetField>
-
-              <SheetField label="Issue date" htmlFor="doc-issue">
-                <SheetInput
-                  id="doc-issue"
-                  value={issueDate}
-                  onChange={setIssueDate}
-                  readOnly={readOnly}
-                  type="date"
-                  error={combinedFieldErrors.issueDate}
-                />
-              </SheetField>
-
-              <SheetField label="Due date" htmlFor="doc-due">
-                <SheetInput
-                  id="doc-due"
-                  value={dueDate}
-                  onChange={setDueDate}
-                  readOnly={readOnly}
-                  type="date"
-                  error={combinedFieldErrors.dueDate}
-                />
-              </SheetField>
-
-              <SheetField
-                label="Billing address"
-                htmlFor="doc-address"
-                className="sm:col-span-2"
-              >
-                <SheetInput
-                  id="doc-address"
-                  value={customerAddress}
-                  onChange={setCustomerAddress}
-                  readOnly={readOnly}
-                  placeholder="Office 1204, Boulevard Plaza Tower 1, Dubai"
-                />
-              </SheetField>
-            </div>
-          </div>
-
-          <LineItemsTable
+          <LineItemEditor
             lines={lines}
             currency={currency}
             preview={preview}
@@ -558,95 +583,156 @@ export function DocumentEditor({
             readOnly={readOnly}
           />
 
-          <div className="rounded-sheet border border-ink-700 bg-ink-850 p-5">
-            <Field label="Notes" htmlFor="doc-notes" hint="shown on the document">
+          {/* Notes: its own titled section, not an afterthought at the bottom
+              of a long page where nobody found it. */}
+          <section className="rounded-sheet border border-ink-700 bg-ink-850">
+            <header className="flex items-center justify-between border-b border-ink-700 px-5 py-3.5">
+              <h2 className="font-display text-base text-quill-100">Notes</h2>
+              <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-quill-700">
+                shown on the document
+              </span>
+            </header>
+            <div className="p-4">
               <Textarea
-                id="doc-notes"
-                rows={3}
+                rows={4}
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 readOnly={readOnly}
                 placeholder="Payment terms, delivery timelines, anything the customer should read."
+                aria-label="Notes"
               />
-            </Field>
-          </div>
-        </div>
+            </div>
+          </section>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <TotalsPanel
-            preview={preview}
-            currency={currency}
-            pending={pending}
-            error={error}
-            latencyMs={latencyMs}
-          />
-
-          {!readOnly && dirty ? (
-            <Button
-              variant="primary"
-              className="mt-3 w-full"
-              onClick={save}
-              loading={saving}
-            >
-              <Save className="size-4" />
-              Save changes
-            </Button>
-          ) : null}
-
-          <dl className="mt-4 space-y-2.5 rounded-sheet border border-ink-700 bg-ink-850 px-5 py-4 text-xs">
+          <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-sheet border border-ink-700 bg-ink-700 text-xs">
             <Meta label="Currency" value={currency} />
             <Meta label="Revision" value={String(document.revision)} />
-            <Meta label="Created" value={formatDateTime(document.createdAt)} />
-            {document.duplicatedFromId ? (
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="font-mono uppercase tracking-[0.12em] text-quill-700">
-                  Copied from
-                </dt>
-                <dd>
-                  <Link
-                    href={`/documents/${document.duplicatedFromId}`}
-                    className="text-brass-400 underline-offset-4 hover:underline"
-                  >
-                    original
-                  </Link>
-                </dd>
-              </div>
-            ) : null}
+            <Meta
+              label="Lines"
+              value={String(lines.length)}
+            />
           </dl>
-        </aside>
+
+          {document.duplicatedFromId ? (
+            <p className="text-xs text-quill-700">
+              Copied from{' '}
+              <Link
+                href={`/documents/${document.duplicatedFromId}`}
+                className="text-brass-400 underline-offset-4 hover:underline"
+              >
+                the original document
+              </Link>
+              .
+            </p>
+          ) : null}
+        </div>
+
+        {/* The document */}
+        <div className={cn('min-h-0', previewOpen ? 'hidden xl:flex' : 'hidden')}>
+          <DocumentViewer
+            page={page}
+            status={pending ? 'computing' : preview ? 'ready' : 'idle'}
+            latencyMs={latencyMs}
+            error={error?.message ?? null}
+            onDownload={openPdf}
+            downloading={busy === 'pdf'}
+            className="w-full"
+          />
+        </div>
+      </div>
+
+      {/* Below xl there is no room for a split, so the document is one tap away. */}
+      <div className="shrink-0 border-t border-ink-800 bg-ink-900 p-3 xl:hidden">
+        <Button variant="secondary" className="w-full" onClick={openPdf} loading={busy === 'pdf'}>
+          View document
+        </Button>
       </div>
     </div>
   );
 }
 
-/* --- Small parchment-surface helpers ------------------------------------ */
+/* -------------------------------------------------------------------------- */
 
-function SheetField({
-  label,
-  htmlFor,
-  children,
-  className,
-}: {
-  label: string;
-  htmlFor: string;
-  children: React.ReactNode;
-  className?: string;
+function Details(props: {
+  title: string;
+  setTitle: (value: string) => void;
+  customerName: string;
+  setCustomerName: (value: string) => void;
+  customerEmail: string;
+  setCustomerEmail: (value: string) => void;
+  customerAddress: string;
+  setCustomerAddress: (value: string) => void;
+  issueDate: string;
+  setIssueDate: (value: string) => void;
+  dueDate: string;
+  setDueDate: (value: string) => void;
+  readOnly: boolean;
+  errors: Record<string, string>;
 }) {
   return (
-    <div className={className}>
-      <label
-        htmlFor={htmlFor}
-        className="mb-1.5 block font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-500"
-      >
-        {label}
-      </label>
-      {children}
-    </div>
+    <section className="rounded-sheet border border-ink-700 bg-ink-850">
+      <header className="border-b border-ink-700 px-5 py-3.5">
+        <h2 className="font-display text-base text-quill-100">Details</h2>
+      </header>
+
+      <div className="space-y-3.5 p-4">
+        <Input
+          label="Title"
+          value={props.title}
+          onChange={props.setTitle}
+          readOnly={props.readOnly}
+          placeholder="Q3 platform renewal"
+          error={props.errors.title}
+        />
+        <Input
+          label="Customer"
+          value={props.customerName}
+          onChange={props.setCustomerName}
+          readOnly={props.readOnly}
+          placeholder="Acme Trading LLC"
+          error={props.errors['customer.name']}
+        />
+        <Input
+          label="Customer email"
+          value={props.customerEmail}
+          onChange={props.setCustomerEmail}
+          readOnly={props.readOnly}
+          type="email"
+          placeholder="accounts@acme.com"
+          error={props.errors['customer.email']}
+        />
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <Input
+            label="Issue date"
+            value={props.issueDate}
+            onChange={props.setIssueDate}
+            readOnly={props.readOnly}
+            type="date"
+            error={props.errors.issueDate}
+          />
+          <Input
+            label="Due date"
+            value={props.dueDate}
+            onChange={props.setDueDate}
+            readOnly={props.readOnly}
+            type="date"
+            error={props.errors.dueDate}
+          />
+        </div>
+        <Input
+          label="Billing address"
+          value={props.customerAddress}
+          onChange={props.setCustomerAddress}
+          readOnly={props.readOnly}
+          placeholder="Office 1204, Boulevard Plaza Tower 1, Dubai"
+        />
+      </div>
+    </section>
   );
 }
 
-function SheetInput({
-  id,
+function Input({
+  label,
   value,
   onChange,
   readOnly,
@@ -654,7 +740,7 @@ function SheetInput({
   type = 'text',
   error,
 }: {
-  id: string;
+  label: string;
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
@@ -662,8 +748,15 @@ function SheetInput({
   type?: string;
   error?: string;
 }) {
+  const id = React.useId();
   return (
     <div>
+      <label
+        htmlFor={id}
+        className="mb-1.5 block font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-quill-700"
+      >
+        {label}
+      </label>
       <input
         id={id}
         type={type}
@@ -672,14 +765,15 @@ function SheetInput({
         readOnly={readOnly}
         placeholder={placeholder}
         aria-invalid={Boolean(error)}
-        className={`h-9 w-full rounded-[2px] border bg-parchment-50 px-2.5 text-sm text-ink-900 outline-none transition-colors placeholder:text-parchment-400 read-only:border-transparent read-only:bg-transparent ${
-          error
-            ? 'border-oxblood-500'
-            : 'border-parchment-300 focus:border-ink-600 focus:bg-white'
-        }`}
+        className={cn(
+          'h-9 w-full rounded-sheet border bg-ink-900 px-2.5 text-sm text-quill-100 transition-colors',
+          'placeholder:text-quill-700 focus:border-brass-600 focus:bg-ink-800',
+          'read-only:border-transparent read-only:bg-transparent read-only:px-0',
+          error ? 'border-oxblood-500' : 'border-ink-600',
+        )}
       />
       {error ? (
-        <p role="alert" className="mt-1 text-[0.6875rem] text-oxblood-500">
+        <p role="alert" className="mt-1 text-[0.6875rem] text-oxblood-300">
           {error}
         </p>
       ) : null}
@@ -689,9 +783,11 @@ function SheetInput({
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="font-mono uppercase tracking-[0.12em] text-quill-700">{label}</dt>
-      <dd className="text-quill-300">{value}</dd>
+    <div className="bg-ink-850 px-3 py-2.5">
+      <dt className="font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-quill-700">
+        {label}
+      </dt>
+      <dd className="tabular mt-1 text-quill-300">{value}</dd>
     </div>
   );
 }

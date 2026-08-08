@@ -1,17 +1,21 @@
+import Link from 'next/link';
 import type { Metadata } from 'next';
 
 import { connectToDatabase } from '@/lib/db';
 import { resolveShareToken } from '@/lib/documents/share';
-import { PrintableDocument } from '@/components/documents/PrintableDocument';
+import { DocumentPage, documentPageProps } from '@/components/documents/DocumentPage';
 import { PrintButton } from '@/components/documents/PrintButton';
-import { Mark } from '@/components/brand';
+import { Wordmark } from '@/components/brand';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * A shared document, viewable by anyone holding the link.
  *
- * `noindex` matters here: a share link is unlisted, not secret-forever, and a
+ * Renders the same `DocumentPage` the editor previews and the PDF route
+ * prints, so the customer sees exactly what the sender saw.
+ *
+ * `noindex` matters here: a share link is unlisted, not secret forever, and a
  * customer's pricing has no business in a search index.
  */
 export const metadata: Metadata = {
@@ -29,7 +33,7 @@ export default async function SharedDocumentPage({
   const shared = await resolveShareToken(token);
 
   if (!shared) {
-    // Unknown, revoked, and expired all render the same page. Telling them
+    // Unknown, revoked and expired all render the same page. Telling them
     // apart would let anyone with a wrong token learn whether a link existed.
     return (
       <div className="flex min-h-dvh items-center justify-center px-6">
@@ -47,27 +51,26 @@ export default async function SharedDocumentPage({
   }
 
   return (
-    <div className="min-h-dvh bg-ink-900 py-10">
-      <div className="no-print mx-auto mb-8 flex max-w-3xl flex-wrap items-center justify-between gap-4 px-6">
-        <span className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-sheet border border-brass-700 bg-brass-500/10 p-1 text-brass-400">
-              <Mark />
-            </span>
-          <span className="font-display text-lg text-quill-100">
-            LedgerLine
-          </span>
-        </span>
+    <div className="tessellate min-h-dvh bg-ink-950">
+      <header className="no-print border-b border-ink-800 bg-ink-900/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[850px] flex-wrap items-center gap-4 px-5 py-3">
+          <Link href="/">
+            <Wordmark />
+          </Link>
 
-        <div className="flex items-center gap-4">
-          <span className="font-mono text-[0.6875rem] text-quill-700">
-            Read-only · expires {new Date(shared.expiresAt).toISOString().slice(0, 10)}
+          <span className="ml-auto font-mono text-[0.625rem] text-quill-700">
+            Read-only · expires{' '}
+            {new Date(shared.expiresAt).toISOString().slice(0, 10)}
           </span>
-          <PrintButton />
+
+          <PrintButton label="Save as PDF" />
         </div>
-      </div>
+      </header>
 
-      <div className="px-6">
-        <PrintableDocument document={shared.document} />
+      <div className="mx-auto max-w-[850px] px-5 py-8 print:max-w-none print:p-0">
+        <div className="shadow-[0_2px_6px_rgba(0,0,0,0.5),0_30px_70px_-24px_rgba(0,0,0,0.85)] print:shadow-none">
+          <DocumentPage {...documentPageProps(shared.document)} />
+        </div>
       </div>
     </div>
   );

@@ -1,44 +1,43 @@
 import Link from 'next/link';
 
 import { calculateDocument } from '@/lib/pricing';
-import { money } from '@/lib/utils';
 import { Wordmark } from '@/components/brand';
+import { SceneMount } from '@/components/landing/SceneMount';
 
 /**
  * The sign-in shell.
  *
- * The left panel carries the product's entire argument in the space of a
- * receipt: the brief's sample document, priced by the production engine at
- * request time, resolving to a figure under a double rule. A reviewer who never
- * signs in still sees 421.50 — and can check that the three line totals sum to
- * it.
+ * The left panel runs the brief's sample document through the production
+ * engine at request time and prints the result as a technical readout — so a
+ * reviewer who never signs in still sees 421.50, and can check the three line
+ * totals sum to it.
  *
- * It is deliberately not a decorative panel. Everything on it is either a
- * computed figure or a claim the app can be checked against.
+ * It is deliberately dark and instrument-like rather than a facsimile of paper.
+ * In this product a light surface means exactly one thing — *this is a page
+ * that will be printed* — and there is no page here, only figures about one.
+ * The tessellation behind it is the same geometry as the landing hero.
  */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.15fr_minmax(0,30rem)]">
+    <div className="grid min-h-dvh lg:grid-cols-[1.1fr_minmax(0,29rem)]">
       {/* Hidden below lg, where it would push the form under the fold. */}
       <aside className="relative hidden overflow-hidden border-r border-ink-800 bg-ink-950 lg:flex lg:flex-col">
-        <div className="tessellate absolute inset-0 opacity-70" aria-hidden />
+        <div className="absolute inset-0">
+          <SceneMount />
+        </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(65%_55%_at_28%_25%,rgba(217,155,50,0.13),transparent_70%)]"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_50%_at_80%_85%,rgba(123,167,206,0.10),transparent_70%)]"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-ink-950/95 via-ink-950/75 to-ink-950/40"
         />
 
-        <div className="relative flex h-full flex-col justify-between gap-10 p-10 xl:p-14">
+        <div className="relative flex h-full flex-col justify-between gap-8 p-10 xl:p-12">
           <Link href="/" className="w-fit">
             <Wordmark />
           </Link>
 
-          <div className="max-w-xl">
+          <div className="max-w-lg">
             <p className="eyebrow">Multi-rate pricing</p>
-            <h2 className="mt-4 text-balance font-display text-[clamp(1.75rem,2.6vw,2.5rem)] text-quill-100">
+            <h2 className="mt-4 text-balance font-display text-[clamp(1.75rem,2.5vw,2.375rem)] text-quill-100">
               Every line priced exactly.
               <br />
               Every total settled.
@@ -49,35 +48,23 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </p>
 
             <WorkedExample />
-
-            <ul className="mt-8 grid gap-2.5 sm:grid-cols-2">
-              {[
-                'Percent or fixed discount, per line',
-                'Tax on the discounted amount',
-                '12 currencies, real minor units',
-                'Finalized documents are immutable',
-              ].map((claim) => (
-                <li
-                  key={claim}
-                  className="flex items-start gap-2.5 text-sm text-quill-500"
-                >
-                  <span
-                    aria-hidden
-                    className="mt-[0.45rem] size-1.5 shrink-0 rotate-45 bg-brass-500"
-                  />
-                  {claim}
-                </li>
-              ))}
-            </ul>
           </div>
 
-          <p className="font-mono text-[0.6875rem] leading-relaxed text-quill-700">
-            Rounding: half-up, per line, to the currency&rsquo;s minor unit.
-            <br />
-            Document totals are sums of already-rounded lines, so
-            subtotal&nbsp;−&nbsp;discount&nbsp;+&nbsp;tax equals the grand total
-            exactly.
-          </p>
+          <dl className="grid max-w-lg grid-cols-2 gap-x-8 gap-y-4">
+            {[
+              ['Discount', 'Percent or fixed, per line — never both'],
+              ['Tax', 'Charged on the discounted amount'],
+              ['Currencies', '12, each at its real minor unit'],
+              ['Once issued', 'Read-only permanently'],
+            ].map(([term, detail]) => (
+              <div key={term} className="border-t border-ink-700 pt-3">
+                <dt className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-brass-400">
+                  {term}
+                </dt>
+                <dd className="mt-1.5 text-sm leading-snug text-quill-500">{detail}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </aside>
 
@@ -92,10 +79,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 }
 
 /**
- * The brief's sample document, on paper.
+ * The sample document as a readout, not a facsimile.
  *
- * Parchment is reserved for document surfaces throughout the product, so it
- * reads here as an actual quote lying on the desk rather than as a UI panel.
+ * Every figure comes from `calculateDocument`, so this is a live assertion
+ * rather than a picture of one.
  */
 function WorkedExample() {
   const { lines, totals } = calculateDocument({
@@ -119,40 +106,41 @@ function WorkedExample() {
   });
 
   return (
-    <figure className="sheet mt-9 max-w-md overflow-hidden">
-      <figcaption className="flex items-baseline justify-between border-b border-parchment-300 px-5 py-2.5">
-        <span className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-ink-500">
+    <figure className="mt-8 max-w-md overflow-hidden rounded-sheet border border-ink-700 bg-ink-900/80 backdrop-blur-sm">
+      <figcaption className="flex items-baseline justify-between border-b border-ink-800 px-4 py-2.5">
+        <span className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-quill-700">
           Worked example
         </span>
-        <span className="font-mono text-[0.5625rem] text-ink-500">
+        <span className="flex items-center gap-1.5 font-mono text-[0.5625rem] text-quill-700">
+          <span aria-hidden className="size-1.5 rounded-full bg-verdigris-400" />
           computed server-side
         </span>
       </figcaption>
 
       <table className="w-full border-collapse text-[0.8125rem]">
         <thead>
-          <tr className="border-b border-parchment-300 text-left font-mono text-[0.5625rem] uppercase tracking-[0.12em] text-ink-500">
-            <th className="px-5 py-2 font-medium">Line</th>
+          <tr className="border-b border-ink-800 text-left font-mono text-[0.5rem] uppercase tracking-[0.14em] text-quill-700">
+            <th className="px-4 py-2 font-medium">Line</th>
             <th className="px-2 py-2 text-right font-medium">Disc.</th>
             <th className="px-2 py-2 text-right font-medium">Tax</th>
-            <th className="px-5 py-2 text-right font-medium">Total</th>
+            <th className="px-4 py-2 text-right font-medium">Total</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((line) => (
-            <tr key={line.description} className="border-b border-parchment-300/60">
-              <td className="px-5 py-1.5 text-ink-800">{line.description}</td>
-              <td className="tabular px-2 py-1.5 text-right text-ink-500">
+            <tr key={line.description} className="border-b border-ink-800/70">
+              <td className="px-4 py-2 text-quill-300">{line.description}</td>
+              <td className="tabular px-2 py-2 text-right text-verdigris-400">
                 {line.discountType === null
                   ? '—'
                   : line.discountType === 'percent'
                     ? `${line.discountValue}%`
                     : `$${line.discountValue}`}
               </td>
-              <td className="tabular px-2 py-1.5 text-right text-ink-500">
+              <td className="tabular px-2 py-2 text-right text-steel-400">
                 {line.taxPercent === null ? '—' : `${line.taxPercent}%`}
               </td>
-              <td className="tabular px-5 py-1.5 text-right font-medium text-ink-900">
+              <td className="tabular px-4 py-2 text-right font-medium text-quill-100">
                 {line.total}
               </td>
             </tr>
@@ -160,31 +148,32 @@ function WorkedExample() {
         </tbody>
       </table>
 
-      <dl className="flex flex-col items-end gap-1 px-5 py-3.5 text-[0.8125rem]">
-        <Row label="Subtotal" value={money(totals.subtotal, 'USD')} />
-        <Row label="Discount" value={`−${money(totals.totalDiscount, 'USD')}`} />
-        <Row label="Tax" value={`+${money(totals.totalTax, 'USD')}`} />
-        <div className="mt-2 flex items-baseline gap-6">
-          <dt className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-ink-600">
-            Grand total
-          </dt>
-          {/* The accountant's mark: this figure is settled. */}
-          <dd className="double-rule tabular text-base font-semibold text-ink-900">
-            {money(totals.grandTotal, 'USD')}
-          </dd>
-        </div>
-      </dl>
-    </figure>
-  );
-}
+      <div className="flex flex-wrap items-end justify-between gap-4 px-4 py-3.5">
+        <dl className="flex gap-5">
+          {[
+            ['Subtotal', totals.subtotal],
+            ['Discount', `−${totals.totalDiscount}`],
+            ['Tax', `+${totals.totalTax}`],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <dt className="font-mono text-[0.5rem] uppercase tracking-[0.14em] text-quill-700">
+                {label}
+              </dt>
+              <dd className="tabular mt-0.5 text-[0.75rem] text-quill-300">{value}</dd>
+            </div>
+          ))}
+        </dl>
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-6">
-      <dt className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-ink-500">
-        {label}
-      </dt>
-      <dd className="tabular w-24 text-right text-ink-700">{value}</dd>
-    </div>
+        <div className="text-right">
+          <p className="font-mono text-[0.5rem] uppercase tracking-[0.14em] text-quill-500">
+            Grand total
+          </p>
+          {/* The accountant's mark: this figure is settled. */}
+          <p className="double-rule tabular mt-1 inline-block text-base font-semibold text-brass-400">
+            ${totals.grandTotal}
+          </p>
+        </div>
+      </div>
+    </figure>
   );
 }

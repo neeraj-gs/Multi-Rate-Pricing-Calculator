@@ -12,9 +12,17 @@
  * which is the same claim the calculation engine makes about a document's
  * totals.
  *
- * The material story: the app is dark tempered steel, and the documents you
- * make in it are paper. Parchment appears on document surfaces and nowhere
- * else, so the material itself tells you what you are looking at.
+ * ## The one rule about light surfaces
+ *
+ * The application is dark, everywhere, without exception. A light surface
+ * appears in exactly one place — `DocumentPage`, the quotation itself — and it
+ * means precisely one thing: *this is a page that will be printed*. Because
+ * nothing else is ever light, a page needs no label to read as a page, and the
+ * PDF is never a surprise.
+ *
+ * Anything that merely talks *about* a document — a worked example, a summary,
+ * a mockup — stays dark and instrument-like. Dressing those up as paper is what
+ * made the product look dated.
  *
  * Two hues do real work, not one. Bronze is the warm key — the metal of the
  * screen. Steel-blue is the cool rim that makes that metal read as metal
@@ -37,12 +45,6 @@
   --color-ink-600: #263145;
   --color-ink-500: #38455e;
 
-  /* --- Parchment: document surfaces only --------------------------------- */
-  --color-parchment-50: #fbf9f4;
-  --color-parchment-100: #f4f1e8;
-  --color-parchment-200: #ebe6d9;
-  --color-parchment-300: #d7cfbb;
-  --color-parchment-400: #b6ab90;
 
   /* --- Bronze: the warm key, and the accent ------------------------------ */
   --color-brass-200: #f7dfae;
@@ -193,14 +195,6 @@
     opacity: 0.85;
   }
 
-  /* Ruled paper, for document surfaces. */
-  .sheet {
-    background-color: var(--color-parchment-100);
-    color: var(--color-ink-900);
-    border-radius: var(--radius-sheet);
-    box-shadow: var(--shadow-sheet);
-  }
-
   /*
    * The tessellation, flattened into CSS.
    *
@@ -294,20 +288,52 @@
   }
 }
 
-/* The printable document: parchment becomes actual paper. */
+/*
+ * Printing.
+ *
+ * The print route lives inside the application shell, so the shell has to be
+ * dismantled rather than merely hidden: a `display: none` sidebar still leaves
+ * its grid column, which pushes the page off-centre on paper. Everything here
+ * exists because a quote came out of the printer with a navigation rail and an
+ * "Add line" button on it.
+ */
 @media print {
   @page {
-    margin: 16mm;
+    margin: 14mm;
   }
+
+  html,
   body {
     background: #fff !important;
     color: #000 !important;
   }
+
   .no-print {
     display: none !important;
   }
-  .sheet {
+
+  /* Collapse the shell's two-column grid to a single flow. */
+  .app-shell {
+    display: block !important;
+  }
+
+  /* Nothing may scroll, clip, or constrain the page on paper. */
+  .document-page {
     box-shadow: none !important;
-    background: #fff !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }
+
+  main,
+  [data-print-region] {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Keep a line and its amount together across a page break. */
+  tr,
+  article {
+    break-inside: avoid;
   }
 }

@@ -20,9 +20,6 @@ const button = cva(
         ghost: 'text-quill-300 hover:bg-ink-800 hover:text-quill-100',
         danger:
           'border border-oxblood-700 bg-oxblood-500/12 text-oxblood-300 hover:bg-oxblood-500/22',
-        /* For use on parchment surfaces, where ink is the foreground. */
-        sheet:
-          'border border-parchment-400 bg-parchment-50 text-ink-800 hover:bg-white',
         link: 'text-brass-400 underline-offset-4 hover:underline p-0 h-auto',
       },
       size: {

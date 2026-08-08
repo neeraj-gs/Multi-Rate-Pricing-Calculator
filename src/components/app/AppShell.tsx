@@ -24,9 +24,10 @@ export function AppShell({
   const [navOpen, setNavOpen] = React.useState(false);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
-      {/* Desktop navigation. */}
-      <aside className="sticky top-0 hidden h-dvh lg:block">
+    <div className="app-shell min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
+      {/* Desktop navigation. `no-print` because the print route lives inside
+          this shell, and a quote must never come out with a sidebar on it. */}
+      <aside className="no-print sticky top-0 hidden h-dvh lg:block">
         <Sidebar user={user} onOpenCommandPalette={() => setPaletteOpen(true)} />
       </aside>
 
@@ -52,7 +53,7 @@ export function AppShell({
       ) : null}
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-ink-800 bg-ink-900/85 px-4 backdrop-blur-xl lg:hidden">
+        <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-ink-800 bg-ink-900/85 px-4 backdrop-blur-xl lg:hidden">
           <button
             type="button"
             onClick={() => setNavOpen((open) => !open)}
