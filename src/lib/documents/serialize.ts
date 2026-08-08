@@ -1,4 +1,4 @@
-import {
+﻿import {
   formatMinor,
   formatPercent,
   formatQuantity,
@@ -7,6 +7,9 @@ import {
 } from '@/lib/pricing';
 import { toCalendarDate } from '@/lib/validation/common';
 import type { DocumentLine, DocumentRecord } from '@/lib/db';
+import type { ApiDocument, ApiLine, ApiTotals } from './types';
+
+export type { ApiDocument, ApiLine, ApiTotals } from './types';
 
 /**
  * Wire format for a document.
@@ -17,69 +20,6 @@ import type { DocumentLine, DocumentRecord } from '@/lib/db';
  * straight back into a float on the way in — the exact drift this system spends
  * its effort avoiding — so no monetary value is ever serialised as a number.
  */
-
-export interface ApiLine {
-  id: string;
-  description: string;
-  position: number;
-  quantity: string;
-  unitPrice: string;
-  discount: { type: DiscountType; value: string } | null;
-  taxPercent: string | null;
-
-  subtotal: string;
-  discountAmount: string;
-  discountedAmount: string;
-  taxAmount: string;
-  total: string;
-
-  amounts: {
-    quantityScaled: number;
-    unitPriceMinor: number;
-    subtotalMinor: number;
-    discountAmountMinor: number;
-    discountedAmountMinor: number;
-    taxAmountMinor: number;
-    totalMinor: number;
-  };
-}
-
-export interface ApiTotals {
-  currency: string;
-  subtotal: string;
-  totalDiscount: string;
-  totalTax: string;
-  grandTotal: string;
-  amounts: {
-    subtotalMinor: number;
-    totalDiscountMinor: number;
-    totalTaxMinor: number;
-    grandTotalMinor: number;
-  };
-  lineCount: number;
-}
-
-export interface ApiDocument {
-  id: string;
-  number: string;
-  title: string;
-  customer: { name: string; email: string; address: string };
-  issueDate: string | null;
-  dueDate: string | null;
-  status: 'draft' | 'finalized';
-  currency: string;
-  notes: string;
-  terms: string;
-  lines: ApiLine[];
-  totals: ApiTotals;
-  /** Convenience for the UI, so it never re-derives the lifecycle rule itself. */
-  editable: boolean;
-  finalizedAt: string | null;
-  duplicatedFromId: string | null;
-  revision: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
 
 function serializeDiscount(
   line: DocumentLine,

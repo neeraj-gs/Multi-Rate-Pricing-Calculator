@@ -45,5 +45,11 @@ docs/superpowers/
 CLAUDE.md
 AGENTS.md
 
+# local database created by `npm run db:local`
+.mongo-data/
+
 # os
 *.swp
+
+# playwright-mcp scratch output
+.playwright-mcp/

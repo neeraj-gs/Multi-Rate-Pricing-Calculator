@@ -29,6 +29,14 @@ const BRASS = '#cda349';
 const VERDIGRIS = '#4a9a8f';
 const PARCHMENT = '#ede8dd';
 
+/** Plate geometry, shared so the rows can be laid out from its real edges. */
+const PLATE_WIDTH = 2.6;
+const PLATE_HEIGHT = 1.5;
+const PLATE_DEPTH = 0.04;
+const TEXT_MARGIN = 0.22;
+const TEXT_LEFT = -PLATE_WIDTH / 2 + TEXT_MARGIN;
+const TEXT_RIGHT = PLATE_WIDTH / 2 - TEXT_MARGIN;
+
 interface PlateProps {
   index: number;
   rows: number;
@@ -42,9 +50,9 @@ function Plate({ index, rows, accent = false, progress, pointer }: PlateProps) {
   const group = React.useRef<THREE.Group>(null);
 
   // Resting position: a staggered stack, fanned out in depth.
-  const restY = 1.15 - index * 1.15;
-  const restZ = -index * 0.55;
-  const restRotation = -0.34 + index * 0.05;
+  const restY = 1.12 - index * 1.12;
+  const restZ = -index * 0.5;
+  const restRotation = -0.28 + index * 0.04;
 
   useFrame((state) => {
     if (!group.current) return;
@@ -52,8 +60,8 @@ function Plate({ index, rows, accent = false, progress, pointer }: PlateProps) {
     // As the reader scrolls, the plates close the gap between them: the
     // document is resolving into a single figure.
     const converge = progress.current;
-    const y = THREE.MathUtils.lerp(restY, 0.12 - index * 0.16, converge);
-    const z = THREE.MathUtils.lerp(restZ, -index * 0.08, converge);
+    const y = THREE.MathUtils.lerp(restY, 0.16 - index * 0.18, converge);
+    const z = THREE.MathUtils.lerp(restZ, -index * 0.07, converge);
 
     // Ambient drift, plus a light parallax lean toward the cursor. Small
     // enough to read as physicality rather than as an effect.
@@ -80,49 +88,80 @@ function Plate({ index, rows, accent = false, progress, pointer }: PlateProps) {
   return (
     <Float speed={1.1} rotationIntensity={0.12} floatIntensity={0.28}>
       <group ref={group} position={[0, restY, restZ]} rotation={[restRotation, 0.42, 0]}>
-        {/* The sheet itself — frosted, faintly transmissive. */}
-        <RoundedBox args={[3.4, 1.9, 0.045]} radius={0.05} smoothness={4}>
+        {/* The sheet itself — frosted glass over a faint ink tint. */}
+        <RoundedBox
+          args={[PLATE_WIDTH, PLATE_HEIGHT, PLATE_DEPTH]}
+          radius={0.045}
+          smoothness={4}
+        >
           <meshPhysicalMaterial
-            color={accent ? '#1c2436' : '#141b2a'}
-            roughness={0.28}
-            metalness={0.12}
-            transmission={0.42}
-            thickness={0.6}
-            ior={1.35}
-            clearcoat={0.7}
-            clearcoatRoughness={0.25}
+            color={accent ? '#2b3550' : '#212b40'}
+            roughness={0.2}
+            metalness={0.05}
+            transmission={0.6}
+            thickness={0.35}
+            ior={1.4}
+            clearcoat={0.55}
+            clearcoatRoughness={0.35}
             transparent
-            opacity={0.92}
+            opacity={0.96}
           />
         </RoundedBox>
 
         {/* A brass edge on the total plate, verdigris on the others. */}
-        <lineSegments position={[0, 0, 0.024]}>
-          <edgesGeometry args={[new THREE.BoxGeometry(3.4, 1.9, 0.045)]} />
+        <lineSegments position={[0, 0, 0]}>
+          <edgesGeometry
+            args={[new THREE.BoxGeometry(PLATE_WIDTH, PLATE_HEIGHT, PLATE_DEPTH)]}
+          />
           <lineBasicMaterial
             color={accent ? BRASS : VERDIGRIS}
             transparent
-            opacity={accent ? 0.85 : 0.32}
+            opacity={accent ? 0.95 : 0.5}
           />
         </lineSegments>
 
-        {/* Ruled rows — a document read from across the room. */}
+        {/*
+          Ruled rows — a document read from across the room.
+
+          Rows are laid out from the plate's own edges: `PLATE_HALF` minus a
+          margin gives the text block's left and right bounds, and each row is
+          centred inside that. Positioning them from an arbitrary offset is how
+          they ended up hanging off the side of the sheet.
+        */}
         {Array.from({ length: rows }).map((_, row) => {
-          const width = row === rows - 1 && accent ? 1.5 : 2.1 - (row % 3) * 0.42;
+          const isTotal = row === rows - 1 && accent;
+          const width = isTotal ? 0.85 : 1.5 - (row % 3) * 0.32;
+          const x = isTotal
+            ? TEXT_RIGHT - width / 2 // the total sits right-aligned
+            : TEXT_LEFT + width / 2;
           return (
-            <mesh
-              key={row}
-              position={[-0.55 + (row === rows - 1 && accent ? 0.75 : 0), 0.52 - row * 0.34, 0.03]}
-            >
-              <planeGeometry args={[width, 0.055]} />
+            <mesh key={row} position={[x, 0.42 - row * 0.26, 0.024]}>
+              <planeGeometry args={[width, 0.045]} />
               <meshBasicMaterial
-                color={row === rows - 1 && accent ? BRASS : PARCHMENT}
+                color={isTotal ? BRASS : PARCHMENT}
                 transparent
-                opacity={row === rows - 1 && accent ? 0.9 : 0.22}
+                opacity={isTotal ? 1 : 0.4}
               />
             </mesh>
           );
         })}
+
+        {/* The double rule under the total — the product's own mark, in 3D. */}
+        {accent
+          ? [0.055, 0.085].map((offset) => (
+              <mesh
+                key={offset}
+                position={[
+                  TEXT_RIGHT - 0.425,
+                  0.42 - (rows - 1) * 0.26 - offset,
+                  0.024,
+                ]}
+              >
+                <planeGeometry args={[0.85, 0.01]} />
+                <meshBasicMaterial color={BRASS} transparent opacity={0.95} />
+              </mesh>
+            ))
+          : null}
       </group>
     </Float>
   );
@@ -138,17 +177,22 @@ function Scene({
   const { camera } = useThree();
 
   React.useEffect(() => {
-    camera.position.set(0.4, 0.1, 6.4);
+    camera.position.set(0, 0, 7.2);
     camera.lookAt(0, 0, 0);
   }, [camera]);
 
   return (
     <>
-      <ambientLight intensity={0.55} />
+      <ambientLight intensity={0.9} />
       {/* A warm brass key from upper right, a cool verdigris fill from the left. */}
-      <directionalLight position={[4, 5, 4]} intensity={1.6} color={BRASS} />
-      <directionalLight position={[-5, -1, 2]} intensity={0.7} color={VERDIGRIS} />
-      <pointLight position={[0, 0, 3]} intensity={12} distance={9} color="#ffffff" />
+      <directionalLight position={[4, 5, 4]} intensity={1.05} color={BRASS} />
+      <directionalLight position={[-5, -1, 3]} intensity={0.9} color={VERDIGRIS} />
+      {/*
+        A broad, distant fill rather than a close point light. Up close the
+        point light burned a specular hotspot into the middle of each sheet,
+        which read as a lens flare rather than as glass.
+      */}
+      <directionalLight position={[0, 0, 6]} intensity={0.6} color="#ffffff" />
 
       <Plate index={0} rows={4} progress={progress} pointer={pointer} />
       <Plate index={1} rows={3} progress={progress} pointer={pointer} />
@@ -231,7 +275,7 @@ export default function LedgerScene() {
           dpr={[1, 2]}
           frameloop={visible ? 'always' : 'demand'}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-          camera={{ fov: 42, position: [0.4, 0.1, 6.4] }}
+          camera={{ fov: 40, position: [0, 0, 7.2] }}
         >
           <React.Suspense fallback={null}>
             <Scene progress={progress} pointer={pointer} />

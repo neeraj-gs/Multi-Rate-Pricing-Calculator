@@ -14,8 +14,6 @@
 
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
 interface MongooseCache {
   connection: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -36,6 +34,12 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   if (cache.connection) return cache.connection;
 
   if (!cache.promise) {
+    // Read at call time, not at module scope. ES imports are hoisted, so a
+    // module-level read runs before any caller has had the chance to load an
+    // env file — which is exactly how a script that loads `.env.local` in its
+    // own body ends up seeing `undefined` here.
+    const MONGODB_URI = process.env.MONGODB_URI;
+
     if (!MONGODB_URI) {
       throw new Error(
         'MONGODB_URI is not set. Copy .env.example to .env.local and provide a MongoDB connection string.',
