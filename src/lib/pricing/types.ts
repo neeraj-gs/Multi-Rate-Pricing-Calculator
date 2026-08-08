@@ -44,6 +44,13 @@ export interface LineTotals {
   discountType: DiscountType | null;
   /** Percent as entered (`"10"`), or the fixed amount (`"20.00"`). */
   discountValue: string | null;
+  /**
+   * The same discount as the integer the database stores: scaled percent when
+   * `discountType === 'percent'`, minor units when `'fixed'`. Carried here so
+   * persistence never has to re-parse the caller's input — one parse, one
+   * source of truth.
+   */
+  discountValueScaled: number | null;
 
   subtotal: string;
   subtotalMinor: number;
@@ -55,6 +62,8 @@ export interface LineTotals {
   discountedAmountMinor: number;
 
   taxPercent: string | null;
+  /** Tax percent x 100, as stored. `null` when the line is untaxed. */
+  taxPercentScaled: number | null;
   taxAmount: string;
   taxAmountMinor: number;
 

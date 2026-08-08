@@ -178,6 +178,12 @@ export function calculateLine(
 
     discountType,
     discountValue,
+    discountValueScaled:
+      discountType === 'percent'
+        ? discountPercentScaled
+        : discountType === 'fixed'
+          ? discountAmountMinor
+          : null,
 
     subtotal: formatMinor(subtotalMinor, currency),
     subtotalMinor,
@@ -189,6 +195,7 @@ export function calculateLine(
     discountedAmountMinor,
 
     taxPercent: line.taxPercent == null ? null : formatPercent(taxPercentScaled),
+    taxPercentScaled: line.taxPercent == null ? null : taxPercentScaled,
     taxAmount: formatMinor(taxAmountMinor, currency),
     taxAmountMinor,
 
