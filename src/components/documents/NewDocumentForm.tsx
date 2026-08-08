@@ -8,7 +8,8 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { api, ApiClientError, newIdempotencyKey } from '@/lib/api-client';
 import { todayISO } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Select } from '@/components/ui/field';
+import { Field, Input } from '@/components/ui/field';
+import { CurrencySelect } from '@/components/ui/currency-select';
 import { PageHeader } from '@/components/app/PageHeader';
 import type { ApiDocument } from '@/lib/documents/types';
 
@@ -35,6 +36,9 @@ export function NewDocumentForm({
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
   const [withSample, setWithSample] = React.useState(false);
+  // The currency picker is a button, not a form control, so its value lives
+  // here rather than being read back out of FormData.
+  const [currency, setCurrency] = React.useState(defaultCurrency);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
 
   // One key per mount, reused across retries: a double-submit or a flaky
@@ -47,7 +51,6 @@ export function NewDocumentForm({
     setFieldErrors({});
 
     const form = new FormData(event.currentTarget);
-    const currency = String(form.get('currency'));
 
     try {
       const { document } = await api.post<{ document: ApiDocument }>(
@@ -160,13 +163,13 @@ export function NewDocumentForm({
               hint="changeable while draft"
               error={fieldErrors.currency}
             >
-              <Select name="currency" defaultValue={defaultCurrency}>
-                {currencies.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </Select>
+              <CurrencySelect
+                id="currency"
+                value={currency}
+                onChange={setCurrency}
+                options={currencies}
+                invalid={Boolean(fieldErrors.currency)}
+              />
             </Field>
           </div>
 

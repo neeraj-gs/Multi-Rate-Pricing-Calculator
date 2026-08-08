@@ -116,6 +116,23 @@
   }
 
   /*
+   * The options list of a native <select> is drawn outside the page's styling.
+   * It takes the control's `color` — near-white here — but not its background,
+   * so on Windows the popup renders pale grey text on the system's white
+   * panel: legible in theory, invisible in practice.
+   *
+   * Setting both on the option itself is the one hook that popup honours.
+   * The currency picker sidesteps the element entirely (it needs search too),
+   * but every remaining select — sort order, status filter, discount type —
+   * depends on this rule.
+   */
+  select option,
+  select optgroup {
+    background-color: var(--color-ink-850);
+    color: var(--color-quill-100);
+  }
+
+  /*
    * Display type: expanded width, heavy, tightly tracked. The extra width is
    * what makes a headline in the same family as the body still read as a
    * different voice.

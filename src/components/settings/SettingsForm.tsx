@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 
 import { api, ApiClientError } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Select } from '@/components/ui/field';
+import { Field, Input } from '@/components/ui/field';
+import { CurrencySelect } from '@/components/ui/currency-select';
 
 /**
  * Preferences that become the defaults on a new document.
@@ -29,6 +30,8 @@ export function SettingsForm({
 }) {
   const [pending, setPending] = React.useState(false);
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+  // Held here, not read from FormData: the picker is a button, not an <input>.
+  const [currency, setCurrency] = React.useState(initial.currency);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,7 +43,7 @@ export function SettingsForm({
       await api.patch('/auth/me', {
         name: String(form.get('name') ?? '').trim(),
         company: String(form.get('company') ?? '').trim(),
-        currency: String(form.get('currency')),
+        currency,
         defaultTaxPercent: Number(form.get('defaultTaxPercent') ?? 0),
         documentPrefix: String(form.get('documentPrefix') ?? '').trim(),
       });
@@ -77,13 +80,13 @@ export function SettingsForm({
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Default currency" htmlFor="currency" error={fieldErrors.currency}>
-          <Select name="currency" defaultValue={initial.currency}>
-            {currencies.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </Select>
+          <CurrencySelect
+            id="currency"
+            value={currency}
+            onChange={setCurrency}
+            options={currencies}
+            invalid={Boolean(fieldErrors.currency)}
+          />
         </Field>
 
         <Field

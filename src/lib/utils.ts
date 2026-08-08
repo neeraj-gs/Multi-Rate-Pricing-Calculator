@@ -49,6 +49,33 @@ export function currencySymbol(currency: string): string {
   return CURRENCY_SYMBOLS[currency] ?? currency;
 }
 
+/**
+ * Currency names, for searching and for saying which one you picked.
+ *
+ * A list of bare three-letter codes assumes the reader already knows them all.
+ * Someone who thinks "rupee" should not have to remember it is filed under
+ * `INR`, and someone scanning a list of eleven codes should be able to tell
+ * `QAR` from `SAR` without looking either up.
+ */
+const CURRENCY_NAMES: Record<string, string> = {
+  AED: 'UAE dirham',
+  SAR: 'Saudi riyal',
+  QAR: 'Qatari riyal',
+  KWD: 'Kuwaiti dinar',
+  BHD: 'Bahraini dinar',
+  OMR: 'Omani rial',
+  EGP: 'Egyptian pound',
+  USD: 'US dollar',
+  EUR: 'Euro',
+  GBP: 'Pound sterling',
+  INR: 'Indian rupee',
+  JPY: 'Japanese yen',
+};
+
+export function currencyName(currency: string): string {
+  return CURRENCY_NAMES[currency] ?? currency;
+}
+
 /** `2026-08-08` -> `8 Aug 2026`. Locale-independent, so it never surprises. */
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
