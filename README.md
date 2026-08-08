@@ -637,9 +637,19 @@ Documented as the brief asks, where it was ambiguous:
    classic source of "the last day of the month is missing from my report".
 6. **Report sums are grouped by currency and never combined.** Adding AED to USD
    produces a number that means nothing.
-7. **Currency is immutable after creation.** Changing it would reinterpret every
-   stored minor-unit amount — 1000 fils is not 1000 cents. Duplicate into the
-   new currency and re-enter prices deliberately.
+7. **Currency can be changed while a document is a draft**, and is frozen once
+   it is finalized. The naive implementation reinterprets every stored integer
+   — 10000 minor units is 100.00 in AED but 10.000 in KWD — so instead each
+   line is read back out as the decimal text it was entered as, and re-parsed
+   at the new precision. A price typed as `100.00` stays 100. Where a value
+   cannot survive the move (`19.99` into JPY, which has no minor unit) the
+   request is rejected naming the line, rather than truncating it.
+
+   Note that a currency change is a genuine **re-pricing**, not a relabelling:
+   the sample document is `421.50` in USD but `422` in JPY, because Widget B's
+   tax of exactly `2.50` rounds half-up to `3` where there is no minor unit.
+   That is the point of rounding per currency rather than to a hardcoded two
+   places, and it is asserted in the tests.
 8. **Finalized documents cannot be deleted**, so past-period reports stay
    stable.
 9. **Line items are limited to 200** per document, keeping the embedded array

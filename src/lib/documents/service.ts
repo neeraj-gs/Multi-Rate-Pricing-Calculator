@@ -239,6 +239,7 @@ export async function updateDocument(
     dueDate: document.dueDate,
     notes: document.notes,
     terms: document.terms,
+    currency: document.currency,
     grandTotalMinor: document.totals.grandTotalMinor,
   };
 
@@ -250,7 +251,29 @@ export async function updateDocument(
   if (input.dueDate !== undefined) document.dueDate = input.dueDate ?? null;
   if (input.notes !== undefined) document.notes = input.notes;
   if (input.terms !== undefined) document.terms = input.terms;
-  if (input.lines !== undefined) applyLines(document, input.lines);
+
+  /*
+   * Currency, and the one ordering that makes it safe.
+   *
+   * Stored amounts are integer minor units, and decoding them back to decimals
+   * depends on the *old* currency's exponent — 10000 is 100.00 in AED and
+   * 10.000 in KWD. So the existing lines have to be read out as text before
+   * the currency changes, and re-priced from that text afterwards. Swapping
+   * the currency first would reinterpret every integer and move every price.
+   */
+  const currencyChanged =
+    input.currency !== undefined && input.currency !== document.currency;
+  const carriedLines = currencyChanged ? currentLineInputs(document) : null;
+
+  if (currencyChanged) document.currency = input.currency!;
+
+  if (input.lines !== undefined) {
+    applyLines(document, input.lines);
+  } else if (carriedLines) {
+    // Re-parsed at the new precision. A value that cannot survive the move —
+    // 100.50 into JPY — throws here, naming the line, instead of truncating.
+    applyLines(document, carriedLines);
+  }
 
   if (document.dueDate && document.issueDate && document.dueDate < document.issueDate) {
     throw ApiError.badRequest('Due date cannot be earlier than the issue date.', [
@@ -274,6 +297,7 @@ export async function updateDocument(
       dueDate: document.dueDate,
       notes: document.notes,
       terms: document.terms,
+      currency: document.currency,
       grandTotalMinor: document.totals.grandTotalMinor,
     }),
     context: ctx,

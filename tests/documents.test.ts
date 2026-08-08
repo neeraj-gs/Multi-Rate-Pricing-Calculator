@@ -362,6 +362,109 @@ describe('editing a draft', () => {
     ).toBe(grandTotalMinor);
   });
 
+  it('changes currency while keeping the values as entered', async () => {
+    // The failure this guards: amounts are stored as integer minor units, so
+    // naively swapping the currency reinterprets every one of them — 45000 is
+    // 450.00 in USD but 45.000 in KWD. Prices must survive as the decimals the
+    // user typed.
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+    expect(draft.totals.subtotal).toBe('450.00');
+
+    const moved = await updateDocument(userId, draft.id, { currency: 'AED' });
+
+    expect(moved.currency).toBe('AED');
+    expect(moved.totals.subtotal).toBe('450.00');
+    expect(moved.totals.grandTotal).toBe('421.50');
+    expect(moved.lines[0].unitPrice).toBe('100.00');
+    expect(moved.lines[2].discount).toEqual({ type: 'fixed', value: '20.00' });
+  });
+
+  it('re-prices at the new currency’s precision', async () => {
+    // KWD has three decimal places, so the stored integers must be rescaled,
+    // not reused: 100.00 becomes 100.000, i.e. 100000 fils rather than 10000.
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+    const moved = await updateDocument(userId, draft.id, { currency: 'KWD' });
+
+    expect(moved.currency).toBe('KWD');
+    expect(moved.lines[0].unitPrice).toBe('100.000');
+    expect(moved.lines[0].amounts.unitPriceMinor).toBe(100_000);
+    expect(moved.totals.grandTotal).toBe('421.500');
+  });
+
+  it('moves whole-unit prices into a zero-decimal currency', async () => {
+    // Every price in the sample is a whole number, and trailing zeros carry no
+    // information — so 100.00 is representable in yen as 100. The move should
+    // succeed rather than being refused on the shape of the string.
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+    const moved = await updateDocument(userId, draft.id, { currency: 'JPY' });
+
+    expect(moved.currency).toBe('JPY');
+    expect(moved.lines[0].unitPrice).toBe('100');
+
+    /*
+     * 422, not 421 — and the difference is the whole point of rounding per
+     * currency rather than to a hardcoded two places.
+     *
+     * Widget B's tax is 5% of 50, which is exactly 2.50. USD keeps that as
+     * 2.50; yen has no minor unit, so it rounds half-up to 3 and the line
+     * comes to 53 rather than 52.50.
+     *
+     *   189 + 53 + 180 = 422
+     *
+     * A currency move is a re-pricing, not a relabelling.
+     */
+    expect(moved.lines[1].taxAmount).toBe('3');
+    expect(moved.lines[1].total).toBe('53');
+    expect(moved.totals.grandTotal).toBe('422');
+
+    // And the identity still holds in the new currency.
+    const { subtotalMinor, totalDiscountMinor, totalTaxMinor, grandTotalMinor } =
+      moved.totals.amounts;
+    expect(subtotalMinor - totalDiscountMinor + totalTaxMinor).toBe(grandTotalMinor);
+  });
+
+  it('refuses a currency an existing price genuinely cannot fit', async () => {
+    // 19.99 has no representation in yen, which has no minor unit. Truncating
+    // to 19 or 20 would silently change a price, so the move is rejected and
+    // the offending line is named.
+    const userId = await makeUser();
+    const draft = await createDocument(
+      userId,
+      parsePayload({
+        lines: [
+          { description: 'Odd price', quantity: 1, unitPrice: '19.99', taxPercent: 5 },
+        ],
+      }),
+    );
+
+    const error = await expectApiError(
+      () => updateDocument(userId, draft.id, { currency: 'JPY' }),
+      'VALIDATION_FAILED',
+      400,
+    );
+    expect(error.details[0].path).toBe('lines.0.unitPrice');
+    expect(error.message).toMatch(/decimal place/i);
+
+    // And the document is untouched by the failed attempt.
+    const after = await loadOwnedDocument(userId, draft.id);
+    expect(after.currency).toBe('USD');
+  });
+
+  it('will not change the currency of a finalized document', async () => {
+    const userId = await makeUser();
+    const draft = await createDocument(userId, parsePayload());
+    await finalizeDocument(userId, draft.id, undefined);
+
+    await expectApiError(
+      () => updateDocument(userId, draft.id, { currency: 'AED' }),
+      'DOCUMENT_FINALIZED',
+      409,
+    );
+  });
+
   it('bumps the revision and rejects a write based on a stale one', async () => {
     const userId = await makeUser();
     const draft = await createDocument(userId, parsePayload());

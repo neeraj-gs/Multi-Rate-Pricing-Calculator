@@ -147,16 +147,27 @@ export const createDocumentSchema = z
   });
 
 /**
- * Updates are a partial of create, minus currency.
+ * Updates are a partial of create.
  *
- * Currency is immutable once a document exists: changing it would reinterpret
- * every stored minor-unit amount (1000 fils is not 1000 cents), so the safe
- * operation is to duplicate the document into the new currency and re-enter the
- * prices deliberately.
+ * ## Changing currency
+ *
+ * Amounts are stored as integer minor units, so the naive swap reinterprets
+ * every one of them — 10000 is 100.00 in AED and 10.000 in KWD, and a price
+ * would silently move by a factor of ten.
+ *
+ * The service therefore does not reinterpret the integers. It reads each line
+ * back out as the decimal text it was entered as, changes the currency, and
+ * re-parses that text at the new precision: a line typed as 100.00 stays 100,
+ * which is what someone switching currency actually means. Where the value
+ * cannot survive the move — 100.50 into JPY, which has no minor unit — the
+ * request is rejected naming the line, rather than quietly truncating it.
+ *
+ * Drafts only. A finalized document is frozen like everything else about it.
  */
 export const updateDocumentSchema = z
   .object({
     title: z.string().trim().min(1, 'Title is required.').max(200).optional(),
+    currency: currencySchema.optional(),
     customer: z
       .object({
         name: z.string().trim().min(1, 'Customer name is required.').max(200),

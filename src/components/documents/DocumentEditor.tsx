@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { api, ApiClientError, newIdempotencyKey } from '@/lib/api-client';
+import { SUPPORTED_CURRENCIES } from '@/lib/pricing';
 import { cn, currencySymbol, formatDateTime, todayISO } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/field';
@@ -102,6 +103,10 @@ export function DocumentEditor({
   const [issueDate, setIssueDate] = React.useState(initial.issueDate ?? todayISO());
   const [dueDate, setDueDate] = React.useState(initial.dueDate ?? '');
   const [notes, setNotes] = React.useState(initial.notes);
+  // Local, so the preview re-prices in the new currency as soon as it is
+  // picked — including surfacing a value that will not fit its precision,
+  // before you save rather than after.
+  const [currency, setCurrency] = React.useState(initial.currency);
   const [lines, setLines] = React.useState<DraftLine[]>(() => toDraftLines(initial));
 
   const [saving, setSaving] = React.useState(false);
@@ -111,7 +116,6 @@ export function DocumentEditor({
   const [previewOpen, setPreviewOpen] = React.useState(true);
 
   const readOnly = !document.editable;
-  const currency = document.currency;
   const symbol = currencySymbol(currency);
 
   const { preview, pending, error, latencyMs, fieldErrors } = usePricingPreview(
@@ -139,6 +143,7 @@ export function DocumentEditor({
         issueDate,
         dueDate,
         notes,
+        currency,
         lines: lines.map(toLineInput),
       }) !==
       JSON.stringify({
@@ -149,9 +154,10 @@ export function DocumentEditor({
         issueDate: document.issueDate ?? todayISO(),
         dueDate: document.dueDate ?? '',
         notes: document.notes,
+        currency: document.currency,
         lines: toDraftLines(document).map(toLineInput),
       }),
-    [title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, lines, document],
+    [title, customerName, customerEmail, customerAddress, issueDate, dueDate, notes, currency, lines, document],
   );
 
   /* --- The live page ----------------------------------------------------- */
@@ -177,14 +183,18 @@ export function DocumentEditor({
         return {
           id: line.key,
           description: line.description,
-          quantity: line.quantity || '—',
-          unitPrice: line.unitPrice || '0.00',
+          // Normalised by the engine, so the page shows what will be stored —
+          // 100.00 reads as 100.000 the moment the currency becomes KWD,
+          // rather than lagging the rest of the figures until the next save.
+          quantity: computed?.quantity ?? line.quantity ?? '—',
+          unitPrice: computed?.unitPrice ?? line.unitPrice ?? '0.00',
           discountLabel:
             line.discountType === 'none' || line.discountValue.trim() === ''
               ? null
               : line.discountType === 'percent'
                 ? `${line.discountValue}%`
-                : `${symbol}${line.discountValue}`,
+                : // A three-letter code needs a space; a single glyph hugs.
+                  `${symbol}${symbol.length > 1 ? ' ' : ''}${line.discountValue}`,
           discountAmount: computed?.discountAmount ?? '0.00',
           taxPercent: line.taxPercent.trim() === '' ? null : line.taxPercent,
           taxAmount: computed?.taxAmount ?? '0.00',
@@ -246,6 +256,7 @@ export function DocumentEditor({
           issueDate,
           dueDate: dueDate || null,
           notes,
+          currency,
           lines: lines.map(toLineInput),
           // Echoing the revision turns a concurrent edit into a 409 we can
           // explain, instead of silently overwriting the other tab.
@@ -254,6 +265,7 @@ export function DocumentEditor({
       );
       setDocument(updated);
       setLines(toDraftLines(updated));
+      setCurrency(updated.currency);
       setSavedAt(updated.updatedAt);
       toast.success('Changes saved');
       return true;
@@ -302,6 +314,7 @@ export function DocumentEditor({
       );
       setDocument(updated);
       setLines(toDraftLines(updated));
+      setCurrency(updated.currency);
       toast.success(`${updated.number} finalized. It is now read-only.`);
     } catch (thrown) {
       const apiError = thrown as ApiClientError;
@@ -567,6 +580,9 @@ export function DocumentEditor({
             setIssueDate={setIssueDate}
             dueDate={dueDate}
             setDueDate={setDueDate}
+            currency={currency}
+            setCurrency={setCurrency}
+            currencyChanged={currency !== document.currency}
             readOnly={readOnly}
             errors={combinedFieldErrors}
           />
@@ -605,12 +621,9 @@ export function DocumentEditor({
           </section>
 
           <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-sheet border border-ink-700 bg-ink-700 text-xs">
-            <Meta label="Currency" value={currency} />
+            <Meta label="Status" value={document.status} />
             <Meta label="Revision" value={String(document.revision)} />
-            <Meta
-              label="Lines"
-              value={String(lines.length)}
-            />
+            <Meta label="Lines" value={String(lines.length)} />
           </dl>
 
           {document.duplicatedFromId ? (
@@ -666,6 +679,9 @@ function Details(props: {
   setIssueDate: (value: string) => void;
   dueDate: string;
   setDueDate: (value: string) => void;
+  currency: string;
+  setCurrency: (value: string) => void;
+  currencyChanged: boolean;
   readOnly: boolean;
   errors: Record<string, string>;
 }) {
@@ -726,6 +742,56 @@ function Details(props: {
           readOnly={props.readOnly}
           placeholder="Office 1204, Boulevard Plaza Tower 1, Dubai"
         />
+
+        <div>
+          <label
+            htmlFor="doc-currency"
+            className="mb-1.5 block font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-quill-700"
+          >
+            Currency
+          </label>
+          {props.readOnly ? (
+            <p className="tabular text-sm text-quill-100">{props.currency}</p>
+          ) : (
+            <select
+              id="doc-currency"
+              value={props.currency}
+              onChange={(event) => props.setCurrency(event.target.value)}
+              aria-invalid={Boolean(props.errors.currency)}
+              className={cn(
+                'h-9 w-full appearance-none rounded-sheet border bg-ink-900 px-2.5 text-sm text-quill-100 transition-colors',
+                'focus:border-brass-600 focus:bg-ink-800',
+                "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%237f8b9f%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:16px] bg-[position:right_0.6rem_center] bg-no-repeat",
+                props.errors.currency ? 'border-oxblood-500' : 'border-ink-600',
+              )}
+            >
+              {SUPPORTED_CURRENCIES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/*
+            Prices keep the numbers you typed; only their precision changes.
+            Saying so up front is the difference between a deliberate switch and
+            a moment of "did that just move every price?".
+          */}
+          {props.currencyChanged ? (
+            <p className="mt-2 rounded-sheet border border-brass-700 bg-brass-500/10 px-3 py-2 text-[0.6875rem] leading-relaxed text-brass-300">
+              Amounts keep the values you entered and are re-priced at{' '}
+              {props.currency}&rsquo;s precision. A price with more decimals than{' '}
+              {props.currency} supports will be reported rather than rounded away.
+            </p>
+          ) : null}
+
+          {props.errors.currency ? (
+            <p role="alert" className="mt-1 text-[0.6875rem] text-oxblood-300">
+              {props.errors.currency}
+            </p>
+          ) : null}
+        </div>
       </div>
     </section>
   );

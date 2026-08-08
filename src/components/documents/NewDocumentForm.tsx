@@ -157,7 +157,7 @@ export function NewDocumentForm({
             <Field
               label="Currency"
               htmlFor="currency"
-              hint="cannot change later"
+              hint="changeable while draft"
               error={fieldErrors.currency}
             >
               <Select name="currency" defaultValue={defaultCurrency}>
@@ -213,9 +213,10 @@ export function NewDocumentForm({
         </div>
 
         <p className="mt-6 font-mono text-xs leading-relaxed text-quill-700">
-          Currency is fixed at creation. Changing it later would reinterpret every
-          stored amount — 1000 fils is not 1000 cents — so the safe move is to
-          duplicate into a new currency and re-enter the prices deliberately.
+          Currency can still be changed while the document is a draft. Prices keep
+          the values you entered and are re-priced at the new currency&rsquo;s
+          precision — so 100.00 stays 100, rather than every stored amount being
+          reinterpreted.
         </p>
       </form>
     </div>

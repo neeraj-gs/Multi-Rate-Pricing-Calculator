@@ -304,7 +304,8 @@ export function documentPageProps(
       discountLabel: line.discount
         ? line.discount.type === 'percent'
           ? `${line.discount.value}%`
-          : `${symbol}${line.discount.value}`
+          : // A three-letter code needs a space; a single glyph hugs.
+            `${symbol}${symbol.length > 1 ? ' ' : ''}${line.discount.value}`
         : null,
       discountAmount: line.discountAmount,
       taxPercent: line.taxPercent,

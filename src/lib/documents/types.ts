@@ -85,9 +85,17 @@ export interface DraftLine {
   taxPercent: string;
 }
 
-/** The preview endpoint's response — the engine's output, unpersisted. */
+/**
+ * The preview endpoint's response — the engine's output, unpersisted.
+ *
+ * `quantity` and `unitPrice` come back normalised to the currency's precision,
+ * which is what lets the preview show what will actually be *stored* rather
+ * than the raw text still sitting in the input.
+ */
 export interface PreviewResponse {
   lines: Array<{
+    quantity: string;
+    unitPrice: string;
     subtotal: string;
     discountAmount: string;
     discountedAmount: string;
