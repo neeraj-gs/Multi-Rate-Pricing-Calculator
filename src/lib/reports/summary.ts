@@ -45,6 +45,25 @@ export interface CurrencyTotals {
     grandTotalMinor: number;
   };
   averageDocumentValue: string;
+
+  /**
+   * Ratios, for reading rather than for accounting.
+   *
+   * These are the two questions a finance lead actually asks of a quote book:
+   * how much am I giving away, and what is tax actually costing on what is left.
+   * They are percentages of already-exact integers, so a float is honest here —
+   * and they are never added to or stored, only displayed.
+   */
+  discountRatePercent: string;
+  effectiveTaxRatePercent: string;
+}
+
+export interface StatusSplit {
+  currency: string;
+  status: 'draft' | 'finalized';
+  documentCount: number;
+  grandTotal: string;
+  grandTotalMinor: number;
 }
 
 export interface SummaryReport {
@@ -56,6 +75,23 @@ export interface SummaryReport {
   byCurrency: CurrencyTotals[];
   /** The currency with the most documents in range — what the UI leads with. */
   primaryCurrency: string | null;
+
+  /** Value committed versus still in progress, which counts alone cannot show. */
+  byStatus: StatusSplit[];
+
+  /**
+   * The same aggregate over the immediately preceding window of equal length.
+   *
+   * A total without a comparison is a number; with one it is a direction. The
+   * window is derived from the requested range rather than a fixed month, so
+   * "last 90 days" compares against the 90 before it.
+   */
+  comparison: {
+    from: string;
+    to: string;
+    documentCount: number;
+    byCurrency: Array<{ currency: string; grandTotalMinor: number }>;
+  } | null;
   timeseries: Array<{
     period: string;
     label: string;
@@ -155,11 +191,52 @@ export async function buildSummaryReport(
     { $limit: 8 },
   ];
 
-  const [totalsRows, timeseriesRows, customerRows] = await Promise.all([
-    DocumentModel.aggregate(totalsPipeline),
-    DocumentModel.aggregate(timeseriesPipeline),
-    DocumentModel.aggregate(topCustomersPipeline),
-  ]);
+  const statusPipeline: PipelineStage[] = [
+    { $match: match },
+    {
+      $group: {
+        _id: { currency: '$currency', status: '$status' },
+        documentCount: { $sum: 1 },
+        grandTotalMinor: { $sum: '$totals.grandTotalMinor' },
+      },
+    },
+    { $sort: { '_id.currency': 1, '_id.status': 1 } },
+  ];
+
+  /*
+   * The preceding window of equal length, so a total reads as a direction
+   * rather than as a bare number. Both bounds inclusive, like the range itself,
+   * which is why the length is (to − from) + 1 day.
+   */
+  const dayMs = 24 * 60 * 60 * 1000;
+  const spanMs = query.to.getTime() - query.from.getTime() + dayMs;
+  const previousTo = new Date(query.from.getTime() - dayMs);
+  const previousFrom = new Date(query.from.getTime() - spanMs);
+
+  const comparisonPipeline: PipelineStage[] = [
+    {
+      $match: {
+        ...match,
+        issueDate: { $gte: previousFrom, $lte: previousTo },
+      },
+    },
+    {
+      $group: {
+        _id: '$currency',
+        documentCount: { $sum: 1 },
+        grandTotalMinor: { $sum: '$totals.grandTotalMinor' },
+      },
+    },
+  ];
+
+  const [totalsRows, timeseriesRows, customerRows, statusRows, comparisonRows] =
+    await Promise.all([
+      DocumentModel.aggregate(totalsPipeline),
+      DocumentModel.aggregate(timeseriesPipeline),
+      DocumentModel.aggregate(topCustomersPipeline),
+      DocumentModel.aggregate(statusPipeline),
+      DocumentModel.aggregate(comparisonPipeline),
+    ]);
 
   const byCurrency: CurrencyTotals[] = totalsRows.map((row) => {
     const currency = row._id as string;
@@ -181,6 +258,14 @@ export async function buildSummaryReport(
         count === 0 ? 0 : Math.round((row.grandTotalMinor as number) / count),
         currency,
       ),
+      discountRatePercent: ratio(
+        row.totalDiscountMinor as number,
+        row.subtotalMinor as number,
+      ),
+      effectiveTaxRatePercent: ratio(
+        row.totalTaxMinor as number,
+        (row.subtotalMinor as number) - (row.totalDiscountMinor as number),
+      ),
     };
   });
 
@@ -200,6 +285,27 @@ export async function buildSummaryReport(
     lineItemCount: totalsRows.reduce((sum, row) => sum + (row.lineItemCount as number), 0),
     byCurrency,
     primaryCurrency: byCurrency[0]?.currency ?? null,
+
+    byStatus: statusRows.map((row) => ({
+      currency: row._id.currency as string,
+      status: row._id.status as 'draft' | 'finalized',
+      documentCount: row.documentCount as number,
+      grandTotal: formatMinor(row.grandTotalMinor, row._id.currency as string),
+      grandTotalMinor: row.grandTotalMinor as number,
+    })),
+
+    comparison: {
+      from: toCalendarDate(previousFrom) ?? '',
+      to: toCalendarDate(previousTo) ?? '',
+      documentCount: comparisonRows.reduce(
+        (sum, row) => sum + (row.documentCount as number),
+        0,
+      ),
+      byCurrency: comparisonRows.map((row) => ({
+        currency: row._id as string,
+        grandTotalMinor: row.grandTotalMinor as number,
+      })),
+    },
     timeseries: timeseriesRows.map((row) => {
       const currency = row._id.currency as string;
       const period = row._id.period as string;
@@ -225,6 +331,18 @@ export async function buildSummaryReport(
       };
     }),
   };
+}
+
+/**
+ * A percentage of two integer minor-unit sums, to one decimal place.
+ *
+ * Division is the one place a ratio has to leave integer arithmetic, and that
+ * is fine precisely because the result is never money: it is displayed, never
+ * summed, and never stored.
+ */
+function ratio(part: number, whole: number): string {
+  if (whole <= 0) return '0.0';
+  return ((part / whole) * 100).toFixed(1);
 }
 
 const MONTH_NAMES = [
